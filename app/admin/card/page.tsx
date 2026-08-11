@@ -175,8 +175,6 @@ function CardDesigner() {
     }
   }
 
-  /* LOAD MEMBER + CREATE QR */
-
   useEffect(() => {
     async function load() {
       if (!memberId) return;
@@ -195,8 +193,13 @@ function CardDesigner() {
 
       setMember(data);
 
+      /*
+       * IMPORTANT:
+       * QR now opens the separate Public Page.
+       */
+
       const publicUrl =
-        `${window.location.origin}/member/${data.id}`;
+        `${window.location.origin}/public-page?id=${data.id}`;
 
       const qrImage =
         await QRCode.toDataURL(publicUrl, {
@@ -209,8 +212,6 @@ function CardDesigner() {
 
     load();
   }, [memberId]);
-
-  /* LOAD SAVED DESIGN */
 
   useEffect(() => {
     if (!memberId) return;
@@ -238,36 +239,22 @@ function CardDesigner() {
     }
   }, [memberId]);
 
-  /* MEMBER DATA */
-
   function displayText(text: string) {
     if (!member) return text;
 
     return text
-      .replaceAll(
-        "[User Name]",
-        member.name || ""
-      )
+      .replaceAll("[User Name]", member.name || "")
       .replaceAll(
         "[Designation]",
         member.designation || ""
       )
-      .replaceAll(
-        "[Village]",
-        member.village || ""
-      )
-      .replaceAll(
-        "[Taluk]",
-        member.taluk || ""
-      )
+      .replaceAll("[Village]", member.village || "")
+      .replaceAll("[Taluk]", member.taluk || "")
       .replaceAll(
         "[District]",
         member.district || ""
       )
-      .replaceAll(
-        "[Mobile]",
-        member.mobile || ""
-      )
+      .replaceAll("[Mobile]", member.mobile || "")
       .replaceAll(
         "[Aadhaar]",
         member.aadhaar || ""
@@ -277,8 +264,6 @@ function CardDesigner() {
         member.membership_no || ""
       );
   }
-
-  /* UPDATE ELEMENT */
 
   function updateElement(
     id: string,
@@ -292,8 +277,6 @@ function CardDesigner() {
       )
     );
   }
-
-  /* ADD TEXT */
 
   function addText() {
     if (locked) return;
@@ -319,8 +302,6 @@ function CardDesigner() {
     setSelectedId(item.id);
     setEditingId(item.id);
   }
-
-  /* ADD IMAGE */
 
   function addImage() {
     if (locked) return;
@@ -364,8 +345,6 @@ function CardDesigner() {
     input.click();
   }
 
-  /* ADD QR */
-
   function addQr() {
     if (locked || !qr) return;
 
@@ -388,8 +367,6 @@ function CardDesigner() {
     setSelectedId(item.id);
   }
 
-  /* DELETE */
-
   function deleteSelected() {
     if (!selectedId || locked) return;
 
@@ -403,8 +380,6 @@ function CardDesigner() {
     setSelectedId(null);
     setEditingId(null);
   }
-
-  /* DRAG */
 
   function startDrag(
     e: React.PointerEvent,
@@ -475,8 +450,6 @@ function CardDesigner() {
     );
   }
 
-  /* SAVE */
-
   function saveDesign() {
     if (!memberId) return;
 
@@ -494,8 +467,6 @@ function CardDesigner() {
       "Design saved successfully ✅"
     );
   }
-
-  /* PDF */
 
   async function generatePDF() {
     if (
@@ -565,8 +536,6 @@ function CardDesigner() {
     }
   }
 
-  /* CARD PREVIEW */
-
   function CardPreview({
     pdf = false,
     pdfSide,
@@ -609,8 +578,6 @@ function CardDesigner() {
         }
       >
 
-        {/* FRONT HEADER */}
-
         {showSide === "front" && (
           <div
             className="absolute top-0 left-0 right-0 bg-gradient-to-r from-green-700 to-blue-700"
@@ -619,8 +586,6 @@ function CardDesigner() {
             }}
           />
         )}
-
-        {/* MEMBER PHOTO */}
 
         {showSide === "front" &&
           member?.photo_url && (
@@ -638,10 +603,7 @@ function CardDesigner() {
             />
           )}
 
-        {/* ELEMENTS */}
-
         {showElements.map((item) => {
-
           const selected =
             selectedId === item.id;
 
@@ -736,8 +698,6 @@ function CardDesigner() {
           );
         })}
 
-        {/* QR */}
-
         {showSide === "front" &&
           qr && (
             <img
@@ -773,8 +733,6 @@ function CardDesigner() {
 
   return (
     <main className="min-h-screen bg-slate-100">
-
-      {/* HEADER */}
 
       <header className="sticky top-0 z-50 bg-white border-b p-4">
 
@@ -826,8 +784,6 @@ function CardDesigner() {
 
       <div className="max-w-7xl mx-auto p-5">
 
-        {/* FRONT / BACK */}
-
         <div className="flex gap-2 mb-5">
 
           <button
@@ -860,8 +816,6 @@ function CardDesigner() {
 
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
 
-          {/* CARD */}
-
           <section className="bg-slate-200 rounded-2xl p-5">
 
             <div className="max-w-[850px] mx-auto">
@@ -875,8 +829,6 @@ function CardDesigner() {
             </p>
 
           </section>
-
-          {/* EDIT PANEL */}
 
           <aside className="bg-white rounded-2xl shadow">
 
@@ -934,8 +886,6 @@ function CardDesigner() {
 
               </div>
 
-              {/* ELEMENT LIST */}
-
               <div className="mt-6">
 
                 <h3 className="font-bold">
@@ -972,8 +922,6 @@ function CardDesigner() {
                 </div>
 
               </div>
-
-              {/* SELECTED EDITOR */}
 
               {selected && (
                 <div className="border-t mt-6 pt-5">
@@ -1174,16 +1122,6 @@ function CardDesigner() {
                     className="w-full"
                   />
 
-                  <button
-                    disabled={locked}
-                    onClick={
-                      deleteSelected
-                    }
-                    className="w-full bg-red-600 text-white rounded-xl p-3 mt-5 disabled:opacity-40"
-                  >
-                    🗑️ Delete
-                  </button>
-
                 </div>
               )}
 
@@ -1199,8 +1137,6 @@ function CardDesigner() {
 
         </div>
 
-        {/* HIDDEN PDF CARDS */}
-
         <div
           style={{
             position: "fixed",
@@ -1208,7 +1144,6 @@ function CardDesigner() {
             top: 0,
           }}
         >
-
           <div
             ref={frontPdfRef}
             style={{
@@ -1234,7 +1169,6 @@ function CardDesigner() {
               pdfSide="back"
             />
           </div>
-
         </div>
 
       </div>
