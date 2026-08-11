@@ -24,7 +24,7 @@ export default function PublicPage() {
     async function loadPage() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const memberId = params.get("member");
+        const memberId = params.get("id");
 
         if (!memberId) {
           setError("Public Page ID ಸಿಗಲಿಲ್ಲ.");
