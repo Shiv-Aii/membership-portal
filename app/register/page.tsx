@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -8,16 +9,42 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setMessage("");
 
     if (!name || !mobile || !email || !password) {
       setMessage("ದಯವಿಟ್ಟು ಎಲ್ಲಾ ಮಾಹಿತಿಯನ್ನು ತುಂಬಿ.");
       return;
     }
 
-    setMessage("Registration ಯಶಸ್ವಿಯಾಗಿದೆ!");
+    setLoading(true);
+
+    const { error } = await supabase.from("applications").insert({
+      name: name,
+      mobile: mobile,
+      email: email,
+      status: "pending",
+    });
+
+    setLoading(false);
+
+    if (error) {
+      console.error(error);
+      setMessage("Registration failed: " + error.message);
+      return;
+    }
+
+    setName("");
+    setMobile("");
+    setEmail("");
+    setPassword("");
+
+    setMessage(
+      "Registration ಯಶಸ್ವಿಯಾಗಿದೆ! ನಿಮ್ಮ ಅರ್ಜಿ Admin Approval ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ."
+    );
   }
 
   return (
@@ -66,9 +93,10 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white rounded-lg p-3 font-semibold"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white rounded-lg p-3 font-semibold disabled:opacity-50"
           >
-            Register
+            {loading ? "Registering..." : "Register"}
           </button>
         </form>
 
