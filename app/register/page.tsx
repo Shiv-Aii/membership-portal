@@ -69,7 +69,7 @@ export default function RegisterPage() {
           mobile,
           aadhaar,
           photo_url: photoUrl,
-          status: "Pending",
+          status: "pending",
         });
 
       if (insertError) {
