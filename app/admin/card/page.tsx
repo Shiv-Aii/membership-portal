@@ -1,105 +1,167 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
+type Side = "front" | "back";
+
 type ElementType = "text" | "image";
 
 type CardElement = {
   id: string;
+  side: Side;
   type: ElementType;
+
   text?: string;
   src?: string;
+
   x: number;
   y: number;
+
   width: number;
   height: number;
+
   fontSize?: number;
   bold?: boolean;
+  color?: string;
 };
 
 const defaultFront: CardElement[] = [
   {
-    id: "title",
+    id: "front-title",
+    side: "front",
     type: "text",
     text: "ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್",
-    x: 8,
-    y: 6,
-    width: 70,
+    x: 5,
+    y: 5,
+    width: 60,
     height: 10,
     fontSize: 16,
     bold: true,
+    color: "#ffffff",
   },
+
   {
-    id: "name",
+    id: "front-name",
+    side: "front",
     type: "text",
-    text: "[User Name]",
-    x: 35,
-    y: 30,
-    width: 45,
+    text: "ಹೆಸರು: [User Name]",
+    x: 25,
+    y: 32,
+    width: 50,
     height: 8,
-    fontSize: 11,
+    fontSize: 10,
     bold: true,
+    color: "#111827",
   },
+
   {
-    id: "designation",
+    id: "front-designation",
+    side: "front",
     type: "text",
-    text: "[Designation]",
-    x: 35,
-    y: 40,
-    width: 45,
+    text: "ಹುದ್ದೆ: [Designation]",
+    x: 25,
+    y: 43,
+    width: 50,
     height: 8,
     fontSize: 9,
+    color: "#111827",
   },
+
   {
-    id: "mobile",
+    id: "front-village",
+    side: "front",
     type: "text",
-    text: "[Mobile]",
-    x: 35,
-    y: 49,
-    width: 45,
+    text: "ಗ್ರಾಮ: [Village]",
+    x: 25,
+    y: 54,
+    width: 50,
     height: 8,
     fontSize: 9,
+    color: "#111827",
+  },
+
+  {
+    id: "front-mobile",
+    side: "front",
+    type: "text",
+    text: "ಮೊಬೈಲ್: [Mobile]",
+    x: 25,
+    y: 65,
+    width: 50,
+    height: 8,
+    fontSize: 9,
+    color: "#111827",
+  },
+
+  {
+    id: "front-id",
+    side: "front",
+    type: "text",
+    text: "Member ID: [Member ID]",
+    x: 25,
+    y: 76,
+    width: 50,
+    height: 8,
+    fontSize: 9,
+    bold: true,
+    color: "#111827",
   },
 ];
 
 const defaultBack: CardElement[] = [
   {
     id: "back-title",
+    side: "back",
     type: "text",
     text: "ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ",
     x: 15,
     y: 15,
-    width: 55,
+    width: 70,
     height: 10,
-    fontSize: 14,
+    fontSize: 15,
     bold: true,
+    color: "#166534",
   },
+
   {
-    id: "back-text",
+    id: "back-description",
+    side: "back",
     type: "text",
-    text: "ಈ ಕಾರ್ಡ್ ಸಂಸ್ಥೆಯ ಸದಸ್ಯತ್ವವನ್ನು ದೃಢೀಕರಿಸುತ್ತದೆ.",
+    text: "ಈ ಕಾರ್ಡ್ ಸಂಸ್ಥೆಯ ಅಧಿಕೃತ ಸದಸ್ಯತ್ವವನ್ನು ದೃಢೀಕರಿಸುತ್ತದೆ.",
     x: 10,
-    y: 30,
-    width: 65,
-    height: 15,
-    fontSize: 9,
+    y: 35,
+    width: 80,
+    height: 20,
+    fontSize: 10,
+    color: "#111827",
   },
 ];
 
 function CardDesigner() {
   const params = useSearchParams();
-  const id = params.get("id");
+
+  const memberId = params.get("id");
 
   const [member, setMember] = useState<any>(null);
-  const [qr, setQr] = useState("");
-  const [locked, setLocked] = useState(false);
 
-  const [side, setSide] = useState<"front" | "back">("front");
+  const [qr, setQr] = useState("");
+
+  const [side, setSide] =
+    useState<Side>("front");
+
+  const [locked, setLocked] =
+    useState(false);
 
   const [frontElements, setFrontElements] =
     useState<CardElement[]>(defaultFront);
@@ -113,17 +175,23 @@ function CardDesigner() {
   const [editingId, setEditingId] =
     useState<string | null>(null);
 
-  const [dragging, setDragging] =
-    useState<string | null>(null);
+  const [message, setMessage] =
+    useState("");
 
-  const [message, setMessage] = useState("");
+  const frontPdfRef =
+    useRef<HTMLDivElement>(null);
 
-  const cardRef = useRef<HTMLDivElement>(null);
+  const backPdfRef =
+    useRef<HTMLDivElement>(null);
 
   const elements =
-    side === "front" ? frontElements : backElements;
+    side === "front"
+      ? frontElements
+      : backElements;
 
-  function setElements(next: CardElement[]) {
+  function updateCurrentElements(
+    next: CardElement[]
+  ) {
     if (side === "front") {
       setFrontElements(next);
     } else {
@@ -131,48 +199,122 @@ function CardDesigner() {
     }
   }
 
+  /* =========================
+     LOAD MEMBER
+  ========================= */
+
   useEffect(() => {
     async function loadMember() {
-      if (!id) return;
+      if (!memberId) return;
 
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const { data, error } =
+        await supabase
+          .from("applications")
+          .select("*")
+          .eq("id", memberId)
+          .single();
 
       if (error) {
         console.error(error);
+        setMessage(
+          "Member load ಆಗಲಿಲ್ಲ."
+        );
         return;
       }
 
       setMember(data);
 
+      /*
+        QR ಯಾವಾಗಲೂ ಈ memberನ
+        separate public pageಗೆ ಹೋಗುತ್ತದೆ.
+      */
+
       const publicUrl =
         `${window.location.origin}/member/${data.id}`;
 
       const qrImage =
-        await QRCode.toDataURL(publicUrl, {
-          width: 500,
-          margin: 1,
-        });
+        await QRCode.toDataURL(
+          publicUrl,
+          {
+            width: 500,
+            margin: 2,
+          }
+        );
 
       setQr(qrImage);
     }
 
     loadMember();
-  }, [id]);
+  }, [memberId]);
 
-  function getValue(text: string) {
+  /* =========================
+     LOAD SAVED DESIGN
+  ========================= */
+
+  useEffect(() => {
+    if (!memberId) return;
+
+    const savedFront =
+      localStorage.getItem(
+        `pvc-front-${memberId}`
+      );
+
+    const savedBack =
+      localStorage.getItem(
+        `pvc-back-${memberId}`
+      );
+
+    if (savedFront) {
+      try {
+        setFrontElements(
+          JSON.parse(savedFront)
+        );
+      } catch {}
+    }
+
+    if (savedBack) {
+      try {
+        setBackElements(
+          JSON.parse(savedBack)
+        );
+      } catch {}
+    }
+  }, [memberId]);
+
+  /* =========================
+     PLACEHOLDER
+  ========================= */
+
+  function displayText(
+    text: string
+  ) {
     if (!member) return text;
 
     return text
-      .replaceAll("[User Name]", member.name || "")
-      .replaceAll("[Designation]", member.designation || "")
-      .replaceAll("[Village]", member.village || "")
-      .replaceAll("[Taluk]", member.taluk || "")
-      .replaceAll("[District]", member.district || "")
-      .replaceAll("[Mobile]", member.mobile || "")
+      .replaceAll(
+        "[User Name]",
+        member.name || ""
+      )
+      .replaceAll(
+        "[Designation]",
+        member.designation || ""
+      )
+      .replaceAll(
+        "[Village]",
+        member.village || ""
+      )
+      .replaceAll(
+        "[Taluk]",
+        member.taluk || ""
+      )
+      .replaceAll(
+        "[District]",
+        member.district || ""
+      )
+      .replaceAll(
+        "[Mobile]",
+        member.mobile || ""
+      )
       .replaceAll(
         "[Aadhaar]",
         member.aadhaar || ""
@@ -183,37 +325,58 @@ function CardDesigner() {
       );
   }
 
+  /* =========================
+     UPDATE
+  ========================= */
+
   function updateElement(
-    elementId: string,
+    id: string,
     changes: Partial<CardElement>
   ) {
-    setElements(
-      elements.map((el) =>
-        el.id === elementId
-          ? { ...el, ...changes }
-          : el
+    updateCurrentElements(
+      elements.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...changes,
+            }
+          : item
       )
     );
   }
 
+  /* =========================
+     ADD TEXT
+  ========================= */
+
   function addText() {
     if (locked) return;
 
-    const element: CardElement = {
+    const item: CardElement = {
       id: crypto.randomUUID(),
+      side,
       type: "text",
       text: "ಹೊಸ ಪಠ್ಯ",
       x: 20,
       y: 20,
-      width: 50,
+      width: 55,
       height: 10,
       fontSize: 10,
+      color: "#111827",
     };
 
-    setElements([...elements, element]);
-    setSelectedId(element.id);
-    setEditingId(element.id);
+    updateCurrentElements([
+      ...elements,
+      item,
+    ]);
+
+    setSelectedId(item.id);
+    setEditingId(item.id);
   }
+
+  /* =========================
+     ADD IMAGE
+  ========================= */
 
   function addImage() {
     if (locked) return;
@@ -225,25 +388,32 @@ function CardDesigner() {
     input.accept = "image/*";
 
     input.onchange = () => {
-      const file = input.files?.[0];
+      const file =
+        input.files?.[0];
 
       if (!file) return;
 
-      const reader = new FileReader();
+      const reader =
+        new FileReader();
 
       reader.onload = () => {
-        const element: CardElement = {
+        const item: CardElement = {
           id: crypto.randomUUID(),
+          side,
           type: "image",
           src: reader.result as string,
           x: 65,
           y: 25,
-          width: 18,
-          height: 22,
+          width: 20,
+          height: 25,
         };
 
-        setElements([...elements, element]);
-        setSelectedId(element.id);
+        updateCurrentElements([
+          ...elements,
+          item,
+        ]);
+
+        setSelectedId(item.id);
       };
 
       reader.readAsDataURL(file);
@@ -252,609 +422,1134 @@ function CardDesigner() {
     input.click();
   }
 
-  function deleteSelected() {
+  /* =========================
+     ADD QR
+  ========================= */
+
+  function addQr() {
+    if (locked || !qr) return;
+
+    const item: CardElement = {
+      id: crypto.randomUUID(),
+      side,
+      type: "image",
+      src: qr,
+      x: 75,
+      y: 55,
+      width: 18,
+      height: 30,
+    };
+
+    updateCurrentElements([
+      ...elements,
+      item,
+    ]);
+
+    setSelectedId(item.id);
+  }
+
+  /* =========================
+     DELETE
+  ========================= */
+
+  function deleteElement() {
     if (!selectedId || locked) return;
 
-    setElements(
+    updateCurrentElements(
       elements.filter(
-        (el) => el.id !== selectedId
+        (item) =>
+          item.id !== selectedId
       )
     );
 
     setSelectedId(null);
+    setEditingId(null);
   }
 
+  /* =========================
+     DRAG
+  ========================= */
+
   function startDrag(
-    e: React.MouseEvent,
-    element: CardElement
+    e: React.PointerEvent,
+    item: CardElement
   ) {
     if (locked) return;
 
     e.preventDefault();
+    e.stopPropagation();
 
-    setSelectedId(element.id);
-    setDragging(element.id);
+    setSelectedId(item.id);
 
     const startX = e.clientX;
     const startY = e.clientY;
 
-    const originalX = element.x;
-    const originalY = element.y;
+    const originalX = item.x;
+    const originalY = item.y;
 
-    function move(ev: MouseEvent) {
+    function move(
+      event: PointerEvent
+    ) {
       const dx =
-        ((ev.clientX - startX) / 600) * 100;
+        ((event.clientX - startX) /
+          600) *
+        100;
 
       const dy =
-        ((ev.clientY - startY) / 380) * 100;
+        ((event.clientY - startY) /
+          380) *
+        100;
 
-      updateElement(element.id, {
+      updateElement(item.id, {
         x: Math.max(
           0,
-          Math.min(100 - element.width, originalX + dx)
+          Math.min(
+            95 - item.width,
+            originalX + dx
+          )
         ),
+
         y: Math.max(
           0,
-          Math.min(100 - element.height, originalY + dy)
+          Math.min(
+            95 - item.height,
+            originalY + dy
+          )
         ),
       });
     }
 
     function stop() {
-      setDragging(null);
-
       window.removeEventListener(
-        "mousemove",
+        "pointermove",
         move
       );
 
       window.removeEventListener(
-        "mouseup",
+        "pointerup",
         stop
       );
     }
 
     window.addEventListener(
-      "mousemove",
+      "pointermove",
       move
     );
 
     window.addEventListener(
-      "mouseup",
+      "pointerup",
       stop
     );
   }
 
-  async function saveTemplate() {
-    try {
-      localStorage.setItem(
-        "pvc-front-template",
-        JSON.stringify(frontElements)
-      );
+  /* =========================
+     SAVE
+  ========================= */
 
-      localStorage.setItem(
-        "pvc-back-template",
-        JSON.stringify(backElements)
-      );
+  function saveDesign() {
+    if (!memberId) return;
 
-      setMessage("Design saved successfully.");
-    } catch {
-      setMessage("Design save failed.");
-    }
+    localStorage.setItem(
+      `pvc-front-${memberId}`,
+      JSON.stringify(
+        frontElements
+      )
+    );
+
+    localStorage.setItem(
+      `pvc-back-${memberId}`,
+      JSON.stringify(
+        backElements
+      )
+    );
+
+    setMessage(
+      "Design saved successfully ✅"
+    );
   }
 
-  useEffect(() => {
-    const f =
-      localStorage.getItem(
-        "pvc-front-template"
-      );
-
-    const b =
-      localStorage.getItem(
-        "pvc-back-template"
-      );
-
-    if (f) {
-      try {
-        setFrontElements(JSON.parse(f));
-      } catch {}
-    }
-
-    if (b) {
-      try {
-        setBackElements(JSON.parse(b));
-      } catch {}
-    }
-  }, []);
+  /* =========================
+     PDF
+  ========================= */
 
   async function generatePDF() {
-    if (!cardRef.current || !member) return;
+    if (
+      !frontPdfRef.current ||
+      !backPdfRef.current ||
+      !member
+    ) {
+      return;
+    }
 
-    const canvas =
-      await html2canvas(cardRef.current, {
-        scale: 4,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
+    try {
+      const frontCanvas =
+        await html2canvas(
+          frontPdfRef.current,
+          {
+            scale: 4,
+            useCORS: true,
+            backgroundColor:
+              "#ffffff",
+          }
+        );
 
-    const image =
-      canvas.toDataURL("image/png");
+      const backCanvas =
+        await html2canvas(
+          backPdfRef.current,
+          {
+            scale: 4,
+            useCORS: true,
+            backgroundColor:
+              "#ffffff",
+          }
+        );
 
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: [85.6, 53.9],
-    });
+      const pdf =
+        new jsPDF({
+          orientation:
+            "landscape",
+          unit: "mm",
+          format: [
+            85.6,
+            53.9,
+          ],
+        });
 
-    pdf.addImage(
-      image,
-      "PNG",
-      0,
-      0,
-      85.6,
-      53.9
-    );
+      pdf.addImage(
+        frontCanvas.toDataURL(
+          "image/png"
+        ),
+        "PNG",
+        0,
+        0,
+        85.6,
+        53.9
+      );
 
-    pdf.save(
-      `${member.membership_no || "member"}-PVC.pdf`
-    );
+      pdf.addPage(
+        [85.6, 53.9],
+        "landscape"
+      );
+
+      pdf.addImage(
+        backCanvas.toDataURL(
+          "image/png"
+        ),
+        "PNG",
+        0,
+        0,
+        85.6,
+        53.9
+      );
+
+      pdf.save(
+        `${
+          member.membership_no ||
+          "member"
+        }-PVC.pdf`
+      );
+
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        "PDF generate ಆಗಲಿಲ್ಲ."
+      );
+    }
   }
 
-  function addQRCodeElement() {
-    if (locked || !qr) return;
+  /* =========================
+     CARD
+  ========================= */
 
-    const element: CardElement = {
-      id: crypto.randomUUID(),
-      type: "image",
-      src: qr,
-      x: 75,
-      y: 60,
-      width: 18,
-      height: 25,
-    };
+  function CardPreview({
+    pdf = false,
+  }: {
+    pdf?: boolean;
+  }) {
+    return (
+      <div
+        className={
+          pdf
+            ? "relative bg-white overflow-hidden"
+            : "relative bg-white overflow-hidden rounded-2xl shadow-xl border"
+        }
+        style={{
+          width: pdf
+            ? "856px"
+            : "100%",
 
-    setFrontElements([
-      ...frontElements,
-      element,
-    ]);
+          height: pdf
+            ? "539px"
+            : undefined,
 
-    setSide("front");
-    setSelectedId(element.id);
+          aspectRatio:
+            pdf
+              ? undefined
+              : "85.6 / 53.9",
+
+          background:
+            "linear-gradient(135deg,#ffffff,#dcfce7)",
+        }}
+        onClick={() =>
+          !pdf &&
+          setSelectedId(null)
+        }
+      >
+
+        {/* FRONT BACK BACKGROUND */}
+
+        {side === "front" && (
+          <>
+            <div
+              className="absolute top-0 left-0 right-0 bg-gradient-to-r from-green-700 to-blue-700"
+              style={{
+                height: "20%",
+              }}
+            />
+
+            {member?.photo_url && (
+              <img
+                src={
+                  member.photo_url
+                }
+                crossOrigin="anonymous"
+                className="absolute object-cover rounded-lg"
+                style={{
+                  left: "5%",
+                  top: "28%",
+                  width: "16%",
+                  height: "38%",
+                }}
+                alt=""
+              />
+            )}
+          </>
+        )}
+
+        {side === "back" && (
+          <div className="absolute inset-0 bg-gradient-to-br from-white to-green-100" />
+        )}
+
+        {/* ELEMENTS */}
+
+        {elements.map(
+          (item) => {
+
+            const selected =
+              selectedId ===
+              item.id;
+
+            return (
+              <div
+                key={item.id}
+                onPointerDown={(e) =>
+                  !pdf &&
+                  startDrag(
+                    e,
+                    item
+                  )
+                }
+                onClick={(e) => {
+                  if (pdf) return;
+
+                  e.stopPropagation();
+
+                  setSelectedId(
+                    item.id
+                  );
+                }}
+                className={
+                  !pdf &&
+                  selected &&
+                  !locked
+                    ? "absolute ring-2 ring-blue-500 cursor-move"
+                    : "absolute"
+                }
+                style={{
+                  left: `${item.x}%`,
+                  top: `${item.y}%`,
+                  width: `${item.width}%`,
+                  height: `${item.height}%`,
+                  zIndex: 20,
+                }}
+              >
+
+                {item.type ===
+                "text" ? (
+                  editingId ===
+                    item.id &&
+                  !locked &&
+                  !pdf ? (
+                    <textarea
+                      autoFocus
+                      value={
+                        item.text ||
+                        ""
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        updateElement(
+                          item.id,
+                          {
+                            text:
+                              e.target
+                                .value,
+                          }
+                        )
+                      }
+                      onBlur={() =>
+                        setEditingId(
+                          null
+                        )
+                      }
+                      className="w-full h-full border bg-white p-1 resize-none"
+                    />
+                  ) : (
+                    <div
+                      onDoubleClick={() =>
+                        !pdf &&
+                        !locked &&
+                        setEditingId(
+                          item.id
+                        )
+                      }
+                      style={{
+                        fontSize:
+                          pdf
+                            ? `${
+                                (item.fontSize ||
+                                  10) *
+                                4
+                              }px`
+                            : `${item.fontSize || 10}px`,
+
+                        fontWeight:
+                          item.bold
+                            ? 700
+                            : 400,
+
+                        color:
+                          item.color ||
+                          "#111827",
+
+                        whiteSpace:
+                          "pre-wrap",
+                      }}
+                    >
+                      {displayText(
+                        item.text ||
+                          ""
+                      )}
+                    </div>
+                  )
+                ) : (
+                  item.src && (
+                    <img
+                      src={item.src}
+                      alt=""
+                      className="w-full h-full object-contain"
+                      draggable={false}
+                    />
+                  )
+                )}
+
+              </div>
+            );
+          }
+        )}
+
+        {/* QR */}
+
+        {side === "front" &&
+          qr && (
+            <img
+              src={qr}
+              alt="QR"
+              className="absolute"
+              style={{
+                right: "4%",
+                bottom: "5%",
+                width: "15%",
+                aspectRatio:
+                  "1 / 1",
+              }}
+            />
+          )}
+
+      </div>
+    );
   }
 
   if (!member) {
     return (
-      <main className="p-10">
-        Member loading...
+      <main className="min-h-screen grid place-items-center">
+        Loading PVC Card...
       </main>
     );
   }
 
+  const selected =
+    elements.find(
+      (item) =>
+        item.id ===
+        selectedId
+    );
+
   return (
     <main className="min-h-screen bg-slate-100">
 
-      <header className="bg-white border-b p-4 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex flex-wrap gap-3 justify-between items-center">
+      {/* HEADER */}
 
-          <h1 className="text-xl font-bold">
-            PVC Card Designer
-          </h1>
+      <header className="sticky top-0 z-50 bg-white border-b p-4">
+
+        <div className="max-w-7xl mx-auto flex flex-wrap justify-between gap-3">
+
+          <div>
+            <h1 className="text-xl font-bold">
+              PVC Card Designer
+            </h1>
+
+            <p className="text-sm text-slate-500">
+              {member.name} •{" "}
+              {member.membership_no}
+            </p>
+          </div>
 
           <div className="flex gap-2">
 
             <button
               onClick={() =>
-                setLocked(!locked)
+                setLocked(
+                  !locked
+                )
               }
-              className="px-4 py-2 rounded-xl bg-slate-900 text-white"
+              className="bg-slate-900 text-white px-4 py-2 rounded-xl"
             >
               {locked
-                ? "🔓 Unlock Design"
+                ? "🔓 Unlock"
                 : "🔒 Lock Design"}
             </button>
 
             <button
-              onClick={saveTemplate}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white"
+              onClick={
+                saveDesign
+              }
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl"
             >
-              Save Design
+              💾 Save
             </button>
 
             <button
-              onClick={generatePDF}
-              className="px-4 py-2 rounded-xl bg-green-600 text-white"
+              onClick={
+                generatePDF
+              }
+              className="bg-green-600 text-white px-4 py-2 rounded-xl"
             >
-              Generate PDF
+              📄 PDF
             </button>
 
           </div>
+
         </div>
+
       </header>
 
-      <div className="max-w-7xl mx-auto p-5 grid lg:grid-cols-[1fr_380px] gap-6">
+      <div className="max-w-7xl mx-auto p-5">
 
-        {/* CARD AREA */}
+        {/* FRONT BACK */}
 
-        <section>
+        <div className="flex gap-2 mb-5">
 
-          <div className="flex gap-2 mb-4">
-
-            <button
-              onClick={() => setSide("front")}
-              className={`px-4 py-2 rounded-xl ${
-                side === "front"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white"
-              }`}
-            >
-              Front
-            </button>
-
-            <button
-              onClick={() => setSide("back")}
-              className={`px-4 py-2 rounded-xl ${
-                side === "back"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white"
-              }`}
-            >
-              Back
-            </button>
-
-          </div>
-
-          <div
-            ref={cardRef}
-            className="relative w-full max-w-[700px] aspect-[85.6/53.9] mx-auto bg-white rounded-2xl overflow-hidden shadow-2xl border"
-            style={{
-              background:
-                "linear-gradient(135deg,#ffffff,#dcfce7)",
-            }}
+          <button
+            onClick={() =>
+              setSide("front")
+            }
+            className={`px-5 py-2 rounded-xl ${
+              side === "front"
+                ? "bg-blue-600 text-white"
+                : "bg-white"
+            }`}
           >
+            Front
+          </button>
 
-            {elements.map((el) => (
+          <button
+            onClick={() =>
+              setSide("back")
+            }
+            className={`px-5 py-2 rounded-xl ${
+              side === "back"
+                ? "bg-blue-600 text-white"
+                : "bg-white"
+            }`}
+          >
+            Back
+          </button>
 
-              <div
-                key={el.id}
-                onMouseDown={(e) =>
-                  startDrag(e, el)
-                }
-                onClick={() =>
-                  setSelectedId(el.id)
-                }
-                className={`absolute cursor-move ${
-                  selectedId === el.id &&
-                  !locked
-                    ? "ring-2 ring-blue-500"
-                    : ""
-                }`}
-                style={{
-                  left: `${el.x}%`,
-                  top: `${el.y}%`,
-                  width: `${el.width}%`,
-                  height: `${el.height}%`,
-                  fontSize: `${el.fontSize || 10}px`,
-                  fontWeight: el.bold
-                    ? "bold"
-                    : "normal",
-                  zIndex: 10,
-                }}
-              >
+        </div>
 
-                {el.type === "text" ? (
-                  editingId === el.id &&
-                  !locked ? (
-                    <textarea
-                      autoFocus
-                      value={el.text || ""}
-                      onChange={(e) =>
-                        updateElement(
-                          el.id,
-                          {
-                            text: e.target.value,
-                          }
-                        )
-                      }
-                      onBlur={() =>
-                        setEditingId(null)
-                      }
-                      className="w-full h-full bg-white/90 border p-1 resize-none"
-                    />
-                  ) : (
-                    <div
-                      onDoubleClick={() =>
-                        !locked &&
-                        setEditingId(el.id)
-                      }
-                      className="w-full h-full whitespace-pre-wrap"
-                    >
-                      {getValue(
-                        el.text || ""
-                      )}
-                    </div>
-                  )
-                ) : (
-                  <img
-                    src={el.src}
-                    className="w-full h-full object-contain pointer-events-none"
-                    alt=""
-                  />
-                )}
+        <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+
+          {/* CARD */}
+
+          <section className="bg-slate-200 rounded-2xl p-5 overflow-auto">
+
+            <div className="max-w-[850px] mx-auto">
+
+              <CardPreview />
+
+            </div>
+
+            <p className="text-center text-sm text-slate-500 mt-4">
+              Text ಮೇಲೆ double-click → edit
+              <br />
+              Drag → position change
+            </p>
+
+          </section>
+
+          {/* EDIT PANEL */}
+
+          <aside className="bg-white rounded-2xl shadow">
+
+            <div className="p-5 border-b">
+
+              <h2 className="font-bold text-lg">
+                Edit Panel
+              </h2>
+
+              <p className="text-sm text-slate-500">
+                ಈ panel ಮಾತ್ರ scroll ಆಗುತ್ತದೆ.
+              </p>
+
+            </div>
+
+            <div className="max-h-[75vh] overflow-y-auto p-5">
+
+              <div className="grid gap-3">
+
+                <button
+                  disabled={locked}
+                  onClick={addText}
+                  className="border rounded-xl p-3 disabled:opacity-40"
+                >
+                  + Add Text
+                </button>
+
+                <button
+                  disabled={locked}
+                  onClick={addImage}
+                  className="border rounded-xl p-3 disabled:opacity-40"
+                >
+                  🖼️ Add Image / Logo
+                </button>
+
+                <button
+                  disabled={
+                    locked ||
+                    !qr
+                  }
+                  onClick={addQr}
+                  className="border rounded-xl p-3 disabled:opacity-40"
+                >
+                  ▣ Add QR Code
+                </button>
+
+                <button
+                  disabled={
+                    locked ||
+                    !selectedId
+                  }
+                  onClick={
+                    deleteElement
+                  }
+                  className="border border-red-300 text-red-600 rounded-xl p-3 disabled:opacity-40"
+                >
+                  🗑️ Delete Selected
+                </button>
 
               </div>
 
-            ))}
+              {/* ELEMENT LIST */}
 
-          </div>
+              <div className="mt-6">
 
-          <p className="text-center mt-3 text-sm text-gray-500">
-            Double-click text → edit
-            <br />
-            Drag → position change
-          </p>
+                <h3 className="font-bold">
+                  {side === "front"
+                    ? "Front Elements"
+                    : "Back Elements"}
+                </h3>
 
-        </section>
+                <div className="grid gap-2 mt-3">
 
-        {/* EDITOR */}
+                  {elements.map(
+                    (item) => (
+                      <button
+                        key={
+                          item.id
+                        }
+                        onClick={() =>
+                          setSelectedId(
+                            item.id
+                          )
+                        }
+                        className={`text-left border rounded-xl p-3 ${
+                          selectedId ===
+                          item.id
+                            ? "bg-blue-50 border-blue-500"
+                            : ""
+                        }`}
+                      >
+                        {item.type ===
+                        "text"
+                          ? `📝 ${item.text}`
+                          : "🖼️ Image"}
+                      </button>
+                    )
+                  )}
 
-        <aside className="bg-white rounded-2xl shadow p-5 h-[calc(100vh-120px)] overflow-y-auto">
+                </div>
 
-          <h2 className="font-bold text-lg">
-            Template Controls
-          </h2>
+              </div>
 
-          <p className="text-sm text-gray-500 mt-2">
-            {locked
-              ? "🔒 Design locked"
-              : "✏️ Editing enabled"}
-          </p>
+              {/* EDIT SELECTED */}
 
-          <div className="grid gap-3 mt-5">
+              {selected && (
+                <div className="border-t mt-6 pt-5">
 
-            <button
-              disabled={locked}
-              onClick={addText}
-              className="border rounded-xl p-3 disabled:opacity-40"
-            >
-              + Add Text
-            </button>
+                  <h3 className="font-bold">
+                    ✏️ Edit Element
+                  </h3>
 
-            <button
-              disabled={locked}
-              onClick={addImage}
-              className="border rounded-xl p-3 disabled:opacity-40"
-            >
-              + Add Image / Logo
-            </button>
+                  {selected.type ===
+                    "text" && (
+                    <>
+                      <label className="block font-semibold mt-4">
+                        Text
+                      </label>
 
-            <button
-              disabled={locked}
-              onClick={addQRCodeElement}
-              className="border rounded-xl p-3 disabled:opacity-40"
-            >
-              + Add QR Code
-            </button>
-
-            <button
-              disabled={
-                locked || !selectedId
-              }
-              onClick={deleteSelected}
-              className="border border-red-300 text-red-600 rounded-xl p-3 disabled:opacity-40"
-            >
-              Delete Selected
-            </button>
-
-          </div>
-
-          {/* SELECTED ELEMENT */}
-
-          {selectedId && (
-            <div className="mt-6 border-t pt-5">
-
-              <h3 className="font-bold mb-3">
-                Edit Selected
-              </h3>
-
-              {(() => {
-                const selected =
-                  elements.find(
-                    (x) =>
-                      x.id === selectedId
-                  );
-
-                if (!selected)
-                  return null;
-
-                return (
-                  <div className="grid gap-3">
-
-                    {selected.type ===
-                      "text" && (
                       <textarea
                         disabled={locked}
                         value={
-                          selected.text || ""
+                          selected.text ||
+                          ""
                         }
-                        onChange={(e) =>
+                        onChange={(
+                          e
+                        ) =>
                           updateElement(
                             selected.id,
                             {
                               text:
-                                e.target.value,
+                                e.target
+                                  .value,
                             }
                           )
                         }
-                        className="border rounded-xl p-3 min-h-[100px]"
+                        className="w-full border rounded-xl p-3 mt-2"
+                        rows={4}
                       />
-                    )}
 
-                    <label>
-                      X Position
+                      <label className="block font-semibold mt-4">
+                        Font Size
+                      </label>
+
                       <input
                         disabled={locked}
                         type="range"
-                        min="0"
-                        max="90"
-                        value={selected.x}
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              x: Number(
-                                e.target.value
-                              ),
-                            }
-                          )
-                        }
-                        className="w-full"
-                      />
-                    </label>
-
-                    <label>
-                      Y Position
-                      <input
-                        disabled={locked}
-                        type="range"
-                        min="0"
-                        max="90"
-                        value={selected.y}
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              y: Number(
-                                e.target.value
-                              ),
-                            }
-                          )
-                        }
-                        className="w-full"
-                      />
-                    </label>
-
-                    <label>
-                      Width
-                      <input
-                        disabled={locked}
-                        type="range"
-                        min="5"
-                        max="90"
+                        min="6"
+                        max="30"
                         value={
-                          selected.width
+                          selected.fontSize ||
+                          10
                         }
-                        onChange={(e) =>
+                        onChange={(
+                          e
+                        ) =>
                           updateElement(
                             selected.id,
                             {
-                              width:
+                              fontSize:
                                 Number(
-                                  e.target.value
+                                  e.target
+                                    .value
                                 ),
                             }
                           )
                         }
                         className="w-full"
                       />
-                    </label>
 
-                    <label>
-                      Height
+                      <label className="flex items-center gap-2 mt-4">
+
+                        <input
+                          disabled={locked}
+                          type="checkbox"
+                          checked={
+                            selected.bold ||
+                            false
+                          }
+                          onChange={(
+                            e
+                          ) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                bold:
+                                  e.target
+                                    .checked,
+                              }
+                            )
+                          }
+                        />
+
+                        Bold
+
+                      </label>
+
+                      <label className="block font-semibold mt-4">
+                        Text Color
+                      </label>
+
                       <input
                         disabled={locked}
-                        type="range"
-                        min="5"
-                        max="80"
+                        type="color"
                         value={
-                          selected.height
+                          selected.color ||
+                          "#111827"
                         }
-                        onChange={(e) =>
+                        onChange={(
+                          e
+                        ) =>
                           updateElement(
                             selected.id,
                             {
-                              height:
-                                Number(
-                                  e.target.value
-                                ),
+                              color:
+                                e.target
+                                  .value,
                             }
                           )
                         }
-                        className="w-full"
+                        className="w-full h-12"
                       />
-                    </label>
 
-                    {selected.type ===
-                      "text" && (
-                      <>
-                        <label>
-                          Font Size
-                          <input
-                            disabled={locked}
-                            type="range"
-                            min="6"
-                            max="32"
-                            value={
-                              selected.fontSize ||
-                              10
-                            }
-                            onChange={(e) =>
-                              updateElement(
-                                selected.id,
-                                {
-                                  fontSize:
-                                    Number(
-                                      e.target
-                                        .value
-                                    ),
-                                }
-                              )
-                            }
-                            className="w-full"
-                          />
-                        </label>
+                    </>
+                  )}
 
-                        <label className="flex gap-2">
-                          <input
-                            disabled={locked}
-                            type="checkbox"
-                            checked={
-                              selected.bold ||
-                              false
-                            }
-                            onChange={(e) =>
-                              updateElement(
-                                selected.id,
-                                {
-                                  bold:
-                                    e.target
-                                      .checked,
-                                }
-                              )
-                            }
-                          />
-                          Bold
-                        </label>
-                      </>
-                    )}
+                  <label className="block font-semibold mt-4">
+                    X Position
+                  </label>
 
-                  </div>
-                );
-              })()}
+                  <input
+                    disabled={locked}
+                    type="range"
+                    min="0"
+                    max="90"
+                    value={
+                      selected.x
+                    }
+                    onChange={(e) =>
+                      updateElement(
+                        selected.id,
+                        {
+                          x: Number(
+                            e.target
+                              .value
+                          ),
+                        }
+                      )
+                    }
+                    className="w-full"
+                  />
+
+                  <label className="block font-semibold mt-4">
+                    Y Position
+                  </label>
+
+                  <input
+                    disabled={locked}
+                    type="range"
+                    min="0"
+                    max="90"
+                    value={
+                      selected.y
+                    }
+                    onChange={(e) =>
+                      updateElement(
+                        selected.id,
+                        {
+                          y: Number(
+                            e.target
+                              .value
+                          ),
+                        }
+                      )
+                    }
+                    className="w-full"
+                  />
+
+                  <label className="block font-semibold mt-4">
+                    Width
+                  </label>
+
+                  <input
+                    disabled={locked}
+                    type="range"
+                    min="5"
+                    max="90"
+                    value={
+                      selected.width
+                    }
+                    onChange={(e) =>
+                      updateElement(
+                        selected.id,
+                        {
+                          width:
+                            Number(
+                              e.target
+                                .value
+                            ),
+                        }
+                      )
+                    }
+                    className="w-full"
+                  />
+
+                  <label className="block font-semibold mt-4">
+                    Height
+                  </label>
+
+                  <input
+                    disabled={locked}
+                    type="range"
+                    min="5"
+                    max="80"
+                    value={
+                      selected.height
+                    }
+                    onChange={(e) =>
+                      updateElement(
+                        selected.id,
+                        {
+                          height:
+                            Number(
+                              e.target
+                                .value
+                            ),
+                        }
+                      )
+                    }
+                    className="w-full"
+                  />
+
+                  <button
+                    disabled={locked}
+                    onClick={
+                      deleteElement
+                    }
+                    className="w-full bg-red-600 text-white rounded-xl p-3 mt-5 disabled:opacity-40"
+                  >
+                    🗑️ Delete
+                  </button>
+
+                </div>
+              )}
+
+              {message && (
+                <div className="mt-5 bg-green-50 text-green-700 rounded-xl p-3">
+                  {message}
+                </div>
+              )}
 
             </div>
-          )}
 
-          {message && (
-            <div className="mt-5 bg-green-50 text-green-700 p-3 rounded-xl">
-              {message}
-            </div>
-          )}
+          </aside>
 
-        </aside>
+        </div>
+
+        {/* HIDDEN PDF FRONT */}
+
+        <div
+          style={{
+            position: "fixed",
+            left: "-10000px",
+            top: 0,
+          }}
+        >
+
+          <div
+            ref={frontPdfRef}
+            style={{
+              width: "856px",
+              height: "539px",
+            }}
+          >
+            <CardPDF
+              side="front"
+            />
+          </div>
+
+          <div
+            ref={backPdfRef}
+            style={{
+              width: "856px",
+              height: "539px",
+            }}
+          >
+            <CardPDF
+              side="back"
+            />
+          </div>
+
+        </div>
 
       </div>
+
     </main>
   );
+
+  function CardPDF({
+    side: pdfSide,
+  }: {
+    side: Side;
+  }) {
+    const pdfElements =
+      pdfSide === "front"
+        ? frontElements
+        : backElements;
+
+    return (
+      <div
+        style={{
+          width: "856px",
+          height: "539px",
+          position: "relative",
+          overflow: "hidden",
+          background:
+            "linear-gradient(135deg,#ffffff,#dcfce7)",
+        }}
+      >
+
+        {pdfSide === "front" && (
+          <>
+            <div
+              style={{
+                position:
+                  "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "20%",
+                background:
+                  "linear-gradient(90deg,#15803d,#1d4ed8)",
+              }}
+            />
+
+            {member?.photo_url && (
+              <img
+                src={
+                  member.photo_url
+                }
+                crossOrigin="anonymous"
+                style={{
+                  position:
+                    "absolute",
+                  left: "5%",
+                  top: "28%",
+                  width: "16%",
+                  height: "38%",
+                  objectFit:
+                    "cover",
+                  borderRadius:
+                    "10px",
+                }}
+                alt=""
+              />
+            )}
+          </>
+        )}
+
+        {pdfElements.map(
+          (item) => (
+            <div
+              key={
+                item.id
+              }
+              style={{
+                position:
+                  "absolute",
+                left:
+                  `${item.x}%`,
+                top:
+                  `${item.y}%`,
+                width:
+                  `${item.width}%`,
+                height:
+                  `${item.height}%`,
+                fontSize:
+                  `${
+                    (item.fontSize ||
+                      10) *
+                    4
+                  }px`,
+                fontWeight:
+                  item.bold
+                    ? 700
+                    : 400,
+                color:
+                  item.color ||
+                  "#111827",
+              }}
+            >
+
+              {item.type ===
+              "text"
+                ? displayText(
+                    item.text ||
+                      ""
+                  )
+                : item.src && (
+                    <img
+                      src={
+                        item.src
+                      }
+                      style={{
+                        width:
+                          "100%",
+                        height:
+                          "100%",
+                        objectFit:
+                          "contain",
+                      }}
+                      alt=""
+                    />
+                  )}
+
+            </div>
+          )
+        )}
+
+        {pdfSide ===
+          "front" &&
+          qr && (
+            <img
+              src={qr}
+              style={{
+                position:
+                  "absolute",
+                right: "4%",
+                bottom: "5%",
+                width: "15%",
+              }}
+              alt=""
+            />
+          )}
+
+      </div>
+    );
+  }
 }
 
 export default function CardPage() {
@@ -862,7 +1557,7 @@ export default function CardPage() {
     <Suspense
       fallback={
         <main className="p-10">
-          Loading...
+          Loading Card Designer...
         </main>
       }
     >
