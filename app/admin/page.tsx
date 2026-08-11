@@ -41,7 +41,7 @@ export default function Admin() {
         return;
       }
 
-      load();
+      await load();
     }
 
     checkUser();
@@ -64,9 +64,57 @@ export default function Admin() {
     await load();
   }
 
+  async function createPublicPage(a: Application) {
+    const { data: existing, error: findError } =
+      await supabase
+        .from("member_info_page")
+        .select("id")
+        .eq("member_id", a.id)
+        .maybeSingle();
+
+    if (findError) {
+      alert(
+        "Public Page check error: " +
+          findError.message
+      );
+      return false;
+    }
+
+    if (existing) {
+      return true;
+    }
+
+    const { error } = await supabase
+      .from("member_info_page")
+      .insert({
+        member_id: a.id,
+        title: "ಸದಸ್ಯರ ಮಾಹಿತಿ",
+        description: "",
+        image_url: a.photo_url || "",
+        phone: a.mobile || "",
+        address:
+          `${a.village || ""}, ${a.taluk || ""}, ${a.district || ""}`.replace(
+            /^,\s*|,\s*$/g,
+            ""
+          ),
+        website: "",
+        is_active: true,
+      });
+
+    if (error) {
+      alert(
+        "Public Page create ಆಗಲಿಲ್ಲ:\n" +
+          error.message
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   async function approve(a: Application) {
     const next = prompt(
-      "Membership Number ಹಾಕಿ.\nಖಾಲಿ ಬಿಟ್ಟರೆ automatic number ಬರುತ್ತದೆ.",
+      "Membership Number ಹಾಕಿ.\n\nಖಾಲಿ ಬಿಟ್ಟರೆ automatic number ಬರುತ್ತದೆ.",
       ""
     );
 
@@ -78,7 +126,8 @@ export default function Admin() {
       "approve_application",
       {
         p_id: a.id,
-        p_membership_no: next.trim() || null,
+        p_membership_no:
+          next.trim() || null,
       }
     );
 
@@ -87,7 +136,27 @@ export default function Admin() {
       return;
     }
 
+    /*
+     * APPROVED MEMBER → AUTOMATIC PUBLIC PAGE
+     */
+    const publicPageCreated =
+      await createPublicPage({
+        ...a,
+        status: "approved",
+        membership_no:
+          next.trim() ||
+          a.membership_no,
+      } as Application);
+
+    if (!publicPageCreated) {
+      return;
+    }
+
     await load();
+
+    alert(
+      "Member Approved ✅\n\nPublic Page ಕೂಡ automatic ಆಗಿ create ಆಗಿದೆ."
+    );
   }
 
   async function reject(a: Application) {
@@ -109,27 +178,35 @@ export default function Admin() {
 
   const shown = apps.filter((a) => {
     const matchesStatus =
-      status === "all" || a.status === status;
+      status === "all" ||
+      a.status === status;
 
     const searchText = Object.values(a)
       .join(" ")
       .toLowerCase();
 
-    const matchesSearch = searchText.includes(
-      q.toLowerCase()
-    );
+    const matchesSearch =
+      searchText.includes(
+        q.toLowerCase()
+      );
 
-    return matchesStatus && matchesSearch;
+    return (
+      matchesStatus &&
+      matchesSearch
+    );
   });
 
   const counts = {
     all: apps.length,
+
     pending: apps.filter(
       (a) => a.status === "pending"
     ).length,
+
     approved: apps.filter(
       (a) => a.status === "approved"
     ).length,
+
     rejected: apps.filter(
       (a) => a.status === "rejected"
     ).length,
@@ -140,6 +217,7 @@ export default function Admin() {
 
       {/* HEADER */}
       <header className="bg-slate-950 text-white">
+
         <div className="max-w-7xl mx-auto px-4 py-5 flex flex-wrap gap-4 justify-between items-center">
 
           <div>
@@ -176,7 +254,9 @@ export default function Admin() {
             </button>
 
           </div>
+
         </div>
+
       </header>
 
       {/* CONTENT */}
@@ -193,12 +273,15 @@ export default function Admin() {
               "rejected",
             ] as const
           ).map((s) => (
+
             <button
               key={s}
-              onClick={() => setStatus(s)}
+              onClick={() =>
+                setStatus(s)
+              }
               className={`
-                bg-white rounded-2xl p-5 text-left
-                shadow-sm
+                bg-white rounded-2xl p-5
+                text-left shadow-sm
                 ${
                   status === s
                     ? "ring-2 ring-green-500"
@@ -206,6 +289,7 @@ export default function Admin() {
                 }
               `}
             >
+
               <div className="text-sm text-slate-500">
                 {s.toUpperCase()}
               </div>
@@ -213,16 +297,19 @@ export default function Admin() {
               <div className="text-3xl font-bold mt-1">
                 {counts[s]}
               </div>
+
             </button>
+
           ))}
 
         </div>
 
-        {/* APPLICATION TABLE */}
+        {/* TABLE */}
         <div className="bg-white rounded-2xl mt-6 shadow-sm overflow-hidden">
 
           {/* SEARCH */}
           <div className="p-4">
+
             <input
               placeholder="ಹೆಸರು / Mobile / District ಹುಡುಕಿ..."
               value={q}
@@ -231,23 +318,31 @@ export default function Admin() {
               }
               className="border rounded-xl px-4 py-3 w-full outline-none focus:ring-2 focus:ring-green-500"
             />
+
           </div>
 
           {loading ? (
+
             <p className="p-6">
               Loading...
             </p>
+
           ) : shown.length === 0 ? (
+
             <div className="p-10 text-center text-slate-500">
               No applications found.
             </div>
+
           ) : (
+
             <div className="overflow-x-auto">
 
               <table className="w-full text-sm">
 
                 <thead className="bg-slate-50">
+
                   <tr>
+
                     {[
                       "ಹೆಸರು",
                       "ಮೊಬೈಲ್",
@@ -256,48 +351,53 @@ export default function Admin() {
                       "Member ID",
                       "Action",
                     ].map((x) => (
+
                       <th
                         key={x}
                         className="text-left p-3 whitespace-nowrap"
                       >
                         {x}
                       </th>
+
                     ))}
+
                   </tr>
+
                 </thead>
 
                 <tbody>
 
                   {shown.map((a) => (
+
                     <tr
                       key={a.id}
                       className="border-t hover:bg-slate-50"
                     >
 
-                      {/* NAME */}
                       <td className="p-3 font-semibold">
                         {a.name}
                       </td>
 
-                      {/* MOBILE */}
                       <td className="p-3">
                         {a.mobile}
                       </td>
 
-                      {/* DISTRICT */}
                       <td className="p-3">
                         {a.district}
                       </td>
 
-                      {/* STATUS */}
                       <td className="p-3">
+
                         <span
                           className={`
-                            px-3 py-1 rounded-full text-xs font-medium
+                            px-3 py-1 rounded-full
+                            text-xs font-medium
                             ${
-                              a.status === "approved"
+                              a.status ===
+                              "approved"
                                 ? "bg-green-100 text-green-700"
-                                : a.status === "rejected"
+                                : a.status ===
+                                  "rejected"
                                 ? "bg-red-100 text-red-700"
                                 : "bg-yellow-100 text-yellow-700"
                             }
@@ -305,19 +405,18 @@ export default function Admin() {
                         >
                           {a.status}
                         </span>
+
                       </td>
 
-                      {/* MEMBER ID */}
                       <td className="p-3">
-                        {a.membership_no || "—"}
+                        {a.membership_no ||
+                          "—"}
                       </td>
 
-                      {/* ACTIONS */}
                       <td className="p-3">
 
                         <div className="flex flex-wrap gap-2">
 
-                          {/* EDIT */}
                           <Link
                             href={`/admin/application?id=${a.id}`}
                             className="border border-slate-300 px-3 py-2 rounded-lg hover:bg-slate-100"
@@ -325,8 +424,8 @@ export default function Admin() {
                             Edit
                           </Link>
 
-                          {/* APPROVE */}
-                          {a.status === "pending" && (
+                          {a.status ===
+                            "pending" && (
                             <button
                               onClick={() =>
                                 approve(a)
@@ -337,8 +436,8 @@ export default function Admin() {
                             </button>
                           )}
 
-                          {/* REJECT */}
-                          {a.status === "pending" && (
+                          {a.status ===
+                            "pending" && (
                             <button
                               onClick={() =>
                                 reject(a)
@@ -349,8 +448,8 @@ export default function Admin() {
                             </button>
                           )}
 
-                          {/* PVC CARD */}
-                          {a.status === "approved" && (
+                          {a.status ===
+                            "approved" && (
                             <Link
                               href={`/admin/card?id=${a.id}`}
                               className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg"
@@ -359,8 +458,8 @@ export default function Admin() {
                             </Link>
                           )}
 
-                          {/* PUBLIC PAGE */}
-                          {a.status === "approved" && (
+                          {a.status ===
+                            "approved" && (
                             <Link
                               href={`/public-page?id=${a.id}`}
                               target="_blank"
@@ -375,6 +474,7 @@ export default function Admin() {
                       </td>
 
                     </tr>
+
                   ))}
 
                 </tbody>
@@ -382,6 +482,7 @@ export default function Admin() {
               </table>
 
             </div>
+
           )}
 
         </div>
