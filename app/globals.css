@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+:root { --brand:#16a34a; --brand2:#2563eb; }
+* { box-sizing:border-box; }
+body { margin:0; font-family: Arial, "Noto Sans Kannada", sans-serif; background:#f6f8fb; color:#172033; }
+button,input,select,textarea { font:inherit; }
+.card-shadow { box-shadow:0 12px 35px rgba(15,23,42,.08); }
+.pvc { width:323px; height:203px; }
+@media print {
+  body { background:white; }
+  .no-print { display:none!important; }
+}
