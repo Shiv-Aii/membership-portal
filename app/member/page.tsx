@@ -1,19 +1,31 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
 
-function MemberPageContent() {
-  const params = useSearchParams();
-  const id = params.get("id");
+type PageData = {
+  id: string;
+  member_id: string;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  phone: string | null;
+  address: string | null;
+  website: string | null;
+  is_active: boolean;
+};
 
-  const [page, setPage] = useState<any>(null);
+function PublicMemberPage() {
+  const searchParams = useSearchParams();
+  const memberId = searchParams.get("id");
+
+  const [page, setPage] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadPage() {
-      if (!id) {
+      if (!memberId) {
         setLoading(false);
         return;
       }
@@ -21,12 +33,12 @@ function MemberPageContent() {
       const { data, error } = await supabase
         .from("member_info_page")
         .select("*")
-        .eq("member_id", id)
+        .eq("member_id", memberId)
         .eq("is_active", true)
         .maybeSingle();
 
       if (error) {
-        console.error("Public page error:", error);
+        console.error(error);
       }
 
       setPage(data);
@@ -34,28 +46,34 @@ function MemberPageContent() {
     }
 
     loadPage();
-  }, [id]);
+  }, [memberId]);
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow p-8">
-          Loading...
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
+          <div className="text-xl font-bold">
+            Loading...
+          </div>
+
+          <p className="text-slate-500 mt-2">
+            Public Page ತೆರೆಯುತ್ತಿದೆ
+          </p>
         </div>
       </main>
     );
   }
 
-  if (!id) {
+  if (!memberId) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-          <h1 className="text-2xl font-bold">
-            Public Member Page
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
+          <h1 className="text-2xl font-bold text-red-600">
+            Invalid Link
           </h1>
 
-          <p className="mt-3 text-gray-500">
-            Invalid member link.
+          <p className="mt-3 text-slate-600">
+            Public Page ID ಕಂಡುಬಂದಿಲ್ಲ.
           </p>
         </div>
       </main>
@@ -64,99 +82,110 @@ function MemberPageContent() {
 
   if (!page) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
-          <h1 className="text-2xl font-bold">
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-10 text-center">
+
+          <div className="text-5xl mb-5">
+            📄
+          </div>
+
+          <h1 className="text-3xl font-bold text-slate-900">
             Public Page
           </h1>
 
-          <p className="mt-3 text-gray-500">
+          <p className="mt-4 text-lg text-slate-500">
             ಈ ಸದಸ್ಯರಿಗೆ Public Page ಇನ್ನೂ publish ಆಗಿಲ್ಲ.
           </p>
+
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 py-8 px-4">
+    <main className="min-h-screen bg-slate-100 p-6">
+
       <div className="max-w-3xl mx-auto">
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
 
           {page.image_url && (
-            <img
-              src={page.image_url}
-              alt=""
-              className="w-full max-h-[450px] object-cover"
-            />
+            <div className="w-full bg-slate-100">
+
+              <img
+                src={page.image_url}
+                alt={page.title || "Public Page"}
+                className="w-full max-h-[450px] object-cover"
+              />
+
+            </div>
           )}
 
-          <div className="p-7 md:p-10">
+          <div className="p-8 md:p-12">
 
-            <h1 className="text-3xl md:text-4xl font-bold text-center">
-              {page.title || "ನಮ್ಮ ಸಂಸ್ಥೆ"}
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
+              {page.title || "Public Page"}
             </h1>
 
             {page.description && (
-              <div className="mt-7 text-gray-700 text-lg leading-8 whitespace-pre-line">
+              <div className="mt-6 text-lg leading-8 text-slate-600 whitespace-pre-line">
                 {page.description}
               </div>
             )}
 
-            <div className="mt-8 border-t pt-6 space-y-4">
+            <div className="mt-8 space-y-4">
 
               {page.phone && (
-                <div>
-                  📞{" "}
-                  <a
-                    href={`tel:${page.phone}`}
-                    className="text-blue-600"
-                  >
+                <div className="p-4 rounded-2xl bg-slate-50">
+                  <div className="text-sm text-slate-500">
+                    ಸಂಪರ್ಕ ಸಂಖ್ಯೆ
+                  </div>
+
+                  <div className="font-semibold text-lg">
                     {page.phone}
-                  </a>
+                  </div>
                 </div>
               )}
 
               {page.address && (
-                <div>
-                  📍 {page.address}
+                <div className="p-4 rounded-2xl bg-slate-50">
+                  <div className="text-sm text-slate-500">
+                    ವಿಳಾಸ
+                  </div>
+
+                  <div className="font-semibold text-lg">
+                    {page.address}
+                  </div>
                 </div>
               )}
 
               {page.website && (
-                <div>
-                  🌐{" "}
-                  <a
-                    href={page.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    Website
-                  </a>
-                </div>
+                <a
+                  href={
+                    page.website.startsWith("http")
+                      ? page.website
+                      : `https://${page.website}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 rounded-2xl bg-blue-50 text-blue-700 font-semibold"
+                >
+                  🌐 Website
+                </a>
               )}
 
             </div>
+
           </div>
+
         </div>
 
       </div>
+
     </main>
   );
 }
 
 export default function MemberPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center">
-          Loading...
-        </main>
-      }
-    >
-      <MemberPageContent />
-    </Suspense>
-  );
+  return <PublicMemberPage />;
 }
