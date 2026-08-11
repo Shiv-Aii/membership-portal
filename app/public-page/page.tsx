@@ -1,10 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-type MemberInfo = {
+type PublicPageData = {
   id: string;
   member_id: string;
   title: string | null;
@@ -16,59 +15,56 @@ type MemberInfo = {
   is_active: boolean;
 };
 
-function PublicPageContent() {
-  const params = useSearchParams();
-  const id = params.get("id");
-
-  const [info, setInfo] = useState<MemberInfo | null>(null);
+export default function PublicPage() {
+  const [data, setData] = useState<PublicPageData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errorText, setErrorText] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadPage() {
-      if (!id) {
-        setErrorText("Invalid public page link.");
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const memberId = params.get("member");
+
+        if (!memberId) {
+          setError("Public Page ID ಸಿಗಲಿಲ್ಲ.");
+          setLoading(false);
+          return;
+        }
+
+        const { data: page, error: dbError } = await supabase
+          .from("member_info_page")
+          .select(
+            "id, member_id, title, description, image_url, phone, address, website, is_active"
+          )
+          .eq("member_id", memberId)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (dbError) {
+          console.error(dbError);
+          setError("Public Page load ಆಗಲಿಲ್ಲ.");
+        } else if (!page) {
+          setError("ಈ ಸದಸ್ಯರಿಗೆ Public Page ಇನ್ನೂ publish ಆಗಿಲ್ಲ.");
+        } else {
+          setData(page);
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Something went wrong.");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const { data, error } = await supabase
-        .from("member_info_page")
-        .select("*")
-        .eq("member_id", id)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (error) {
-        console.error(error);
-        setErrorText(error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!data) {
-        setErrorText(
-          "ಈ ಸದಸ್ಯರಿಗೆ Public Page ಇನ್ನೂ ಸಿದ್ಧವಾಗಿಲ್ಲ."
-        );
-        setLoading(false);
-        return;
-      }
-
-      setInfo(data as MemberInfo);
-      setLoading(false);
     }
 
     loadPage();
-  }, [id]);
+  }, []);
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow p-8 text-center">
-          <div className="text-xl font-bold">
-            Loading...
-          </div>
-
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
+        <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="text-xl font-bold">Loading...</div>
           <p className="text-slate-500 mt-2">
             Public Page ತೆರೆಯಲಾಗುತ್ತಿದೆ
           </p>
@@ -77,23 +73,19 @@ function PublicPageContent() {
     );
   }
 
-  if (errorText || !info) {
+  if (error || !data) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-lg p-8 text-center">
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
+        <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="text-6xl mb-5">⚠️</div>
 
-          <div className="text-5xl mb-4">
-            ⚠️
-          </div>
-
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-slate-900">
             Public Page
           </h1>
 
-          <p className="text-slate-500 mt-4">
-            {errorText}
+          <p className="text-slate-500 mt-4 text-lg">
+            {error}
           </p>
-
         </div>
       </main>
     );
@@ -101,142 +93,115 @@ function PublicPageContent() {
 
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4">
+      <div className="max-w-3xl mx-auto">
 
-      <div className="max-w-2xl mx-auto">
-
-        {/* HEADER */}
+        {/* Header */}
         <div className="bg-slate-950 text-white rounded-t-3xl p-6 text-center">
-
-          <h1 className="text-2xl font-bold">
-            {info.title || "Member Public Page"}
+          <h1 className="text-2xl md:text-3xl font-bold">
+            {data.title || "Member Public Page"}
           </h1>
-
         </div>
 
-        {/* MAIN CARD */}
-        <div className="bg-white rounded-b-3xl shadow-lg overflow-hidden">
+        {/* Main Card */}
+        <div className="bg-white rounded-b-3xl shadow-xl overflow-hidden">
 
-          {/* IMAGE */}
-          {info.image_url && (
-            <div className="w-full bg-slate-100">
-
+          {/* Image */}
+          {data.image_url && (
+            <div className="w-full bg-slate-100 flex justify-center p-6">
               <img
-                src={info.image_url}
-                alt={info.title || "Member"}
-                className="w-full max-h-[420px] object-cover"
+                src={data.image_url}
+                alt={data.title || "Member"}
+                className="max-h-80 max-w-full object-contain rounded-2xl"
               />
-
             </div>
           )}
 
-          <div className="p-6">
+          {/* Details */}
+          <div className="p-6 md:p-8">
 
-            {/* TITLE */}
-            {info.title && (
-              <h2 className="text-2xl font-bold text-slate-900">
-                {info.title}
-              </h2>
-            )}
-
-            {/* DESCRIPTION */}
-            {info.description && (
-              <div className="mt-5">
-
-                <h3 className="font-semibold text-slate-900 mb-2">
+            {data.description && (
+              <div className="mb-7">
+                <h2 className="text-lg font-bold text-slate-900 mb-2">
                   ಮಾಹಿತಿ
-                </h3>
+                </h2>
 
                 <p className="text-slate-600 whitespace-pre-wrap leading-7">
-                  {info.description}
+                  {data.description}
                 </p>
-
               </div>
             )}
 
-            {/* CONTACT */}
-            <div className="mt-6 space-y-3">
+            <div className="grid gap-4">
 
-              {info.phone && (
+              {data.phone && (
                 <a
-                  href={`tel:${info.phone}`}
-                  className="block border rounded-xl p-4 hover:bg-slate-50"
+                  href={`tel:${data.phone}`}
+                  className="border rounded-2xl p-4 hover:bg-slate-50"
                 >
-                  <span className="font-semibold">
-                    📞 Phone
-                  </span>
+                  <div className="text-sm text-slate-500">
+                    ಮೊಬೈಲ್
+                  </div>
 
-                  <span className="block text-slate-600 mt-1">
-                    {info.phone}
-                  </span>
+                  <div className="font-semibold text-lg">
+                    {data.phone}
+                  </div>
                 </a>
               )}
 
-              {info.address && (
-                <div className="border rounded-xl p-4">
-
-                  <div className="font-semibold">
-                    📍 Address
+              {data.address && (
+                <div className="border rounded-2xl p-4">
+                  <div className="text-sm text-slate-500">
+                    ವಿಳಾಸ
                   </div>
 
-                  <div className="text-slate-600 mt-1 whitespace-pre-wrap">
-                    {info.address}
+                  <div className="font-semibold text-lg">
+                    {data.address}
                   </div>
-
                 </div>
               )}
 
-              {info.website && (
+              {data.website && (
                 <a
                   href={
-                    info.website.startsWith("http")
-                      ? info.website
-                      : `https://${info.website}`
+                    data.website.startsWith("http")
+                      ? data.website
+                      : `https://${data.website}`
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block border rounded-xl p-4 hover:bg-slate-50"
+                  className="border rounded-2xl p-4 hover:bg-slate-50"
                 >
-                  <span className="font-semibold">
-                    🌐 Website
-                  </span>
+                  <div className="text-sm text-slate-500">
+                    Website
+                  </div>
 
-                  <span className="block text-blue-600 mt-1 break-all">
-                    {info.website}
-                  </span>
+                  <div className="font-semibold text-lg text-blue-600 break-all">
+                    {data.website}
+                  </div>
                 </a>
               )}
 
             </div>
 
-            {/* FOOTER */}
-            <div className="border-t mt-8 pt-5 text-center">
+            {/* Member ID */}
+            <div className="mt-8 bg-slate-50 rounded-2xl p-5 text-center">
+              <div className="text-sm text-slate-500">
+                Member ID
+              </div>
 
-              <p className="text-xs text-slate-400">
-                Official Public Information Page
-              </p>
-
+              <div className="text-xl font-bold mt-1 break-all">
+                {data.member_id}
+              </div>
             </div>
 
           </div>
-
         </div>
 
+        <p className="text-center text-sm text-slate-400 mt-5">
+          Official Member Public Page
+        </p>
+
       </div>
-
     </main>
-  );
-}
-
-export default function PublicPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center bg-slate-100">
-          <p>Loading Public Page...</p>
-        </main>
-      }
-    >
-      <PublicPageContent />
-    </Suspense>
   );
 }
