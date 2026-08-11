@@ -1,81 +1,138 @@
 "use client";
 
-import {
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { useSearchParams } from "next/navigation";
 
-type Side = "front" | "back";
 type ElementType = "text" | "image";
 
 type CardElement = {
   id: string;
-  side: Side;
   type: ElementType;
-
   text?: string;
   src?: string;
-
   x: number;
   y: number;
-
   width: number;
   height: number;
-
   fontSize?: number;
   bold?: boolean;
-  color?: string;
-  align?: "left" | "center" | "right";
 };
 
-const CARD_WIDTH = 856;
-const CARD_HEIGHT = 539;
+const defaultFront: CardElement[] = [
+  {
+    id: "title",
+    type: "text",
+    text: "ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್",
+    x: 8,
+    y: 6,
+    width: 70,
+    height: 10,
+    fontSize: 16,
+    bold: true,
+  },
+  {
+    id: "name",
+    type: "text",
+    text: "[User Name]",
+    x: 35,
+    y: 30,
+    width: 45,
+    height: 8,
+    fontSize: 11,
+    bold: true,
+  },
+  {
+    id: "designation",
+    type: "text",
+    text: "[Designation]",
+    x: 35,
+    y: 40,
+    width: 45,
+    height: 8,
+    fontSize: 9,
+  },
+  {
+    id: "mobile",
+    type: "text",
+    text: "[Mobile]",
+    x: 35,
+    y: 49,
+    width: 45,
+    height: 8,
+    fontSize: 9,
+  },
+];
 
-function Card() {
+const defaultBack: CardElement[] = [
+  {
+    id: "back-title",
+    type: "text",
+    text: "ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ",
+    x: 15,
+    y: 15,
+    width: 55,
+    height: 10,
+    fontSize: 14,
+    bold: true,
+  },
+  {
+    id: "back-text",
+    type: "text",
+    text: "ಈ ಕಾರ್ಡ್ ಸಂಸ್ಥೆಯ ಸದಸ್ಯತ್ವವನ್ನು ದೃಢೀಕರಿಸುತ್ತದೆ.",
+    x: 10,
+    y: 30,
+    width: 65,
+    height: 15,
+    fontSize: 9,
+  },
+];
+
+function CardDesigner() {
   const params = useSearchParams();
   const id = params.get("id");
 
   const [member, setMember] = useState<any>(null);
   const [qr, setQr] = useState("");
-
-  const [side, setSide] = useState<Side>("front");
-
   const [locked, setLocked] = useState(false);
 
-  const [title, setTitle] = useState(
-    "ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್"
-  );
+  const [side, setSide] = useState<"front" | "back">("front");
 
-  const [elements, setElements] = useState<CardElement[]>(
-    []
-  );
+  const [frontElements, setFrontElements] =
+    useState<CardElement[]>(defaultFront);
 
-  const [selectedId, setSelectedId] = useState<string | null>(
-    null
-  );
+  const [backElements, setBackElements] =
+    useState<CardElement[]>(defaultBack);
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [selectedId, setSelectedId] =
+    useState<string | null>(null);
 
-  const [newText, setNewText] = useState("");
+  const [editingId, setEditingId] =
+    useState<string | null>(null);
 
-  const frontRef = useRef<HTMLDivElement>(null);
-  const backRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] =
+    useState<string | null>(null);
 
-  const imageInput = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState("");
 
-  /* =========================
-     LOAD MEMBER
-  ========================= */
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const elements =
+    side === "front" ? frontElements : backElements;
+
+  function setElements(next: CardElement[]) {
+    if (side === "front") {
+      setFrontElements(next);
+    } else {
+      setBackElements(next);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
+    async function loadMember() {
       if (!id) return;
 
       const { data, error } = await supabase
@@ -91,267 +148,31 @@ function Card() {
 
       setMember(data);
 
-      if (data) {
-        const publicUrl =
-          `${window.location.origin}/member?id=${data.id}`;
+      const publicUrl =
+        `${window.location.origin}/member/${data.id}`;
 
-        const qrData = await QRCode.toDataURL(
-          publicUrl,
-          {
-            width: 400,
-            margin: 2,
-          }
-        );
+      const qrImage =
+        await QRCode.toDataURL(publicUrl, {
+          width: 500,
+          margin: 1,
+        });
 
-        setQr(qrData);
-      }
+      setQr(qrImage);
     }
 
-    load();
+    loadMember();
   }, [id]);
 
-  /* =========================
-     DEFAULT ELEMENTS
-  ========================= */
-
-  useEffect(() => {
-    if (!member) return;
-
-    const saved = localStorage.getItem(
-      `pvc-design-${member.id}`
-    );
-
-    if (saved) {
-      try {
-        setElements(JSON.parse(saved));
-        return;
-      } catch {
-        console.log("Saved design invalid");
-      }
-    }
-
-    const defaults: CardElement[] = [
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್",
-        x: 28,
-        y: 20,
-        width: 450,
-        height: 50,
-        fontSize: 28,
-        bold: true,
-        color: "#ffffff",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ಹೆಸರು: [User Name]",
-        x: 210,
-        y: 155,
-        width: 400,
-        height: 40,
-        fontSize: 22,
-        bold: false,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ಹುದ್ದೆ: [Designation]",
-        x: 210,
-        y: 200,
-        width: 400,
-        height: 40,
-        fontSize: 20,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ಗ್ರಾಮ: [Village]",
-        x: 210,
-        y: 240,
-        width: 400,
-        height: 40,
-        fontSize: 18,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ಮೊಬೈಲ್: [Mobile]",
-        x: 210,
-        y: 280,
-        width: 400,
-        height: 40,
-        fontSize: 18,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "Member ID: [Member ID]",
-        x: 210,
-        y: 320,
-        width: 400,
-        height: 40,
-        fontSize: 20,
-        bold: true,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "front",
-        type: "text",
-        text: "ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ",
-        x: 170,
-        y: 455,
-        width: 500,
-        height: 40,
-        fontSize: 20,
-        bold: true,
-        color: "#166534",
-        align: "center",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "back",
-        type: "text",
-        text: "ಸದಸ್ಯರ ವಿವರಗಳು",
-        x: 280,
-        y: 70,
-        width: 350,
-        height: 45,
-        fontSize: 25,
-        bold: true,
-        color: "#166534",
-        align: "center",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "back",
-        type: "text",
-        text: "ಜಿಲ್ಲೆ: [District]",
-        x: 120,
-        y: 150,
-        width: 600,
-        height: 40,
-        fontSize: 20,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "back",
-        type: "text",
-        text: "ತಾಲೂಕು: [Taluk]",
-        x: 120,
-        y: 195,
-        width: 600,
-        height: 40,
-        fontSize: 20,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "back",
-        type: "text",
-        text: "Aadhaar: [Aadhaar]",
-        x: 120,
-        y: 240,
-        width: 600,
-        height: 40,
-        fontSize: 18,
-        color: "#111827",
-        align: "left",
-      },
-
-      {
-        id: crypto.randomUUID(),
-        side: "back",
-        type: "text",
-        text: "QR Scan ಮಾಡಿ Member Details ನೋಡಿ",
-        x: 180,
-        y: 440,
-        width: 500,
-        height: 40,
-        fontSize: 16,
-        color: "#475569",
-        align: "center",
-      },
-    ];
-
-    setElements(defaults);
-  }, [member]);
-
-  /* =========================
-     SAVE DESIGN
-  ========================= */
-
-  function saveDesign() {
-    if (!member) return;
-
-    localStorage.setItem(
-      `pvc-design-${member.id}`,
-      JSON.stringify(elements)
-    );
-
-    alert("PVC Design saved successfully.");
-  }
-
-  /* =========================
-     REPLACE PLACEHOLDERS
-  ========================= */
-
-  function displayText(text: string) {
+  function getValue(text: string) {
     if (!member) return text;
 
     return text
       .replaceAll("[User Name]", member.name || "")
-      .replaceAll(
-        "[Designation]",
-        member.designation || ""
-      )
-      .replaceAll(
-        "[Village]",
-        member.village || ""
-      )
-      .replaceAll(
-        "[Taluk]",
-        member.taluk || ""
-      )
-      .replaceAll(
-        "[District]",
-        member.district || ""
-      )
-      .replaceAll(
-        "[Mobile]",
-        member.mobile || ""
-      )
+      .replaceAll("[Designation]", member.designation || "")
+      .replaceAll("[Village]", member.village || "")
+      .replaceAll("[Taluk]", member.taluk || "")
+      .replaceAll("[District]", member.district || "")
+      .replaceAll("[Mobile]", member.mobile || "")
       .replaceAll(
         "[Aadhaar]",
         member.aadhaar || ""
@@ -362,143 +183,97 @@ function Card() {
       );
   }
 
-  /* =========================
-     ADD TEXT
-  ========================= */
+  function updateElement(
+    elementId: string,
+    changes: Partial<CardElement>
+  ) {
+    setElements(
+      elements.map((el) =>
+        el.id === elementId
+          ? { ...el, ...changes }
+          : el
+      )
+    );
+  }
 
   function addText() {
-    const item: CardElement = {
+    if (locked) return;
+
+    const element: CardElement = {
       id: crypto.randomUUID(),
-      side,
       type: "text",
-      text: newText || "ಹೊಸ ಪಠ್ಯ",
-      x: 150,
-      y: 350,
-      width: 450,
-      height: 50,
-      fontSize: 22,
-      bold: false,
-      color: "#111827",
-      align: "left",
+      text: "ಹೊಸ ಪಠ್ಯ",
+      x: 20,
+      y: 20,
+      width: 50,
+      height: 10,
+      fontSize: 10,
     };
 
-    setElements((prev) => [
-      ...prev,
-      item,
-    ]);
-
-    setSelectedId(item.id);
-    setNewText("");
-    setShowAdd(false);
+    setElements([...elements, element]);
+    setSelectedId(element.id);
+    setEditingId(element.id);
   }
 
-  /* =========================
-     IMAGE UPLOAD
-  ========================= */
+  function addImage() {
+    if (locked) return;
 
-  async function uploadImage(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = e.target.files?.[0];
+    const input =
+      document.createElement("input");
 
-    if (!file) return;
+    input.type = "file";
+    input.accept = "image/*";
 
-    try {
-      const path =
-        `designer-${Date.now()}-${file.name}`;
+    input.onchange = () => {
+      const file = input.files?.[0];
 
-      const { error } = await supabase.storage
-        .from("member-photos")
-        .upload(path, file, {
-          upsert: true,
-          contentType: file.type,
-        });
+      if (!file) return;
 
-      if (error) throw error;
+      const reader = new FileReader();
 
-      const { data } = supabase.storage
-        .from("member-photos")
-        .getPublicUrl(path);
+      reader.onload = () => {
+        const element: CardElement = {
+          id: crypto.randomUUID(),
+          type: "image",
+          src: reader.result as string,
+          x: 65,
+          y: 25,
+          width: 18,
+          height: 22,
+        };
 
-      const item: CardElement = {
-        id: crypto.randomUUID(),
-        side,
-        type: "image",
-        src: data.publicUrl,
-        x: 50,
-        y: 60,
-        width: 130,
-        height: 100,
+        setElements([...elements, element]);
+        setSelectedId(element.id);
       };
 
-      setElements((prev) => [
-        ...prev,
-        item,
-      ]);
+      reader.readAsDataURL(file);
+    };
 
-      setSelectedId(item.id);
-
-      alert("Image added.");
-    } catch (error: any) {
-      alert(
-        "Image upload failed: " +
-        (error?.message || "Unknown error")
-      );
-    }
-
-    if (imageInput.current) {
-      imageInput.current.value = "";
-    }
+    input.click();
   }
 
-  /* =========================
-     DELETE
-  ========================= */
+  function deleteSelected() {
+    if (!selectedId || locked) return;
 
-  function deleteElement(elementId: string) {
-    setElements((prev) =>
-      prev.filter(
-        (item) => item.id !== elementId
+    setElements(
+      elements.filter(
+        (el) => el.id !== selectedId
       )
     );
 
     setSelectedId(null);
   }
 
-  /* =========================
-     UPDATE
-  ========================= */
-
-  function updateElement(
-    elementId: string,
-    changes: Partial<CardElement>
-  ) {
-    setElements((prev) =>
-      prev.map((item) =>
-        item.id === elementId
-          ? {
-              ...item,
-              ...changes,
-            }
-          : item
-      )
-    );
-  }
-
-  /* =========================
-     DRAG
-  ========================= */
-
   function startDrag(
-    e: React.PointerEvent,
+    e: React.MouseEvent,
     element: CardElement
   ) {
     if (locked) return;
 
     e.preventDefault();
-    e.stopPropagation();
 
     setSelectedId(element.id);
+    setDragging(element.id);
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -506,910 +281,580 @@ function Card() {
     const originalX = element.x;
     const originalY = element.y;
 
-    function move(ev: PointerEvent) {
+    function move(ev: MouseEvent) {
       const dx =
-        ev.clientX - startX;
+        ((ev.clientX - startX) / 600) * 100;
 
       const dy =
-        ev.clientY - startY;
+        ((ev.clientY - startY) / 380) * 100;
 
       updateElement(element.id, {
         x: Math.max(
           0,
-          Math.min(
-            CARD_WIDTH - element.width,
-            originalX + dx
-          )
+          Math.min(100 - element.width, originalX + dx)
         ),
-
         y: Math.max(
           0,
-          Math.min(
-            CARD_HEIGHT - element.height,
-            originalY + dy
-          )
+          Math.min(100 - element.height, originalY + dy)
         ),
       });
     }
 
     function stop() {
+      setDragging(null);
+
       window.removeEventListener(
-        "pointermove",
+        "mousemove",
         move
       );
 
       window.removeEventListener(
-        "pointerup",
+        "mouseup",
         stop
       );
     }
 
     window.addEventListener(
-      "pointermove",
+      "mousemove",
       move
     );
 
     window.addEventListener(
-      "pointerup",
+      "mouseup",
       stop
     );
   }
 
-  /* =========================
-     CURRENT ELEMENT
-  ========================= */
+  async function saveTemplate() {
+    try {
+      localStorage.setItem(
+        "pvc-front-template",
+        JSON.stringify(frontElements)
+      );
 
-  const selected =
-    elements.find(
-      (x) => x.id === selectedId
-    ) || null;
+      localStorage.setItem(
+        "pvc-back-template",
+        JSON.stringify(backElements)
+      );
 
-  /* =========================
-     RENDER ELEMENT
-  ========================= */
+      setMessage("Design saved successfully.");
+    } catch {
+      setMessage("Design save failed.");
+    }
+  }
 
-  function renderElement(
-    element: CardElement
-  ) {
-    if (element.side !== side) {
-      return null;
+  useEffect(() => {
+    const f =
+      localStorage.getItem(
+        "pvc-front-template"
+      );
+
+    const b =
+      localStorage.getItem(
+        "pvc-back-template"
+      );
+
+    if (f) {
+      try {
+        setFrontElements(JSON.parse(f));
+      } catch {}
     }
 
-    const isSelected =
-      selectedId === element.id;
-
-    return (
-      <div
-        key={element.id}
-        onPointerDown={(e) =>
-          startDrag(e, element)
-        }
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedId(element.id);
-        }}
-        className={`absolute ${
-          isSelected
-            ? "ring-2 ring-blue-500"
-            : ""
-        }`}
-        style={{
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
-          zIndex: 20,
-          cursor: locked
-            ? "default"
-            : "move",
-        }}
-      >
-        {element.type === "text" ? (
-          <div
-            style={{
-              fontSize:
-                element.fontSize || 20,
-
-              fontWeight:
-                element.bold
-                  ? 700
-                  : 400,
-
-              color:
-                element.color ||
-                "#111827",
-
-              textAlign:
-                element.align ||
-                "left",
-
-              width: "100%",
-            }}
-          >
-            {displayText(
-              element.text || ""
-            )}
-          </div>
-        ) : (
-          element.src && (
-            <img
-              src={element.src}
-              alt="Card element"
-              className="w-full h-full object-contain"
-              draggable={false}
-            />
-          )
-        )}
-
-        {isSelected && !locked && (
-          <button
-            type="button"
-            onPointerDown={(e) =>
-              e.stopPropagation()
-            }
-            onClick={() =>
-              deleteElement(
-                element.id
-              )
-            }
-            className="absolute -top-3 -right-3 bg-red-600 text-white w-7 h-7 rounded-full"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  /* =========================
-     CARD
-  ========================= */
-
-  function CardPreview() {
-    return (
-      <div
-        className="relative bg-white overflow-hidden border rounded-xl shadow-xl"
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          transformOrigin: "top left",
-        }}
-        onClick={() =>
-          setSelectedId(null)
-        }
-      >
-        {side === "front" && (
-          <>
-            <div className="absolute inset-x-0 top-0 h-[110px] bg-gradient-to-r from-green-700 to-blue-700" />
-
-            {member?.photo_url && (
-              <img
-                src={member.photo_url}
-                crossOrigin="anonymous"
-                className="absolute object-cover rounded-lg"
-                style={{
-                  left: 40,
-                  top: 145,
-                  width: 130,
-                  height: 165,
-                }}
-                alt="Member"
-              />
-            )}
-
-            {qr && (
-              <img
-                src={qr}
-                className="absolute"
-                style={{
-                  right: 40,
-                  top: 155,
-                  width: 125,
-                  height: 125,
-                }}
-                alt="QR"
-              />
-            )}
-          </>
-        )}
-
-        {side === "back" && (
-          <div className="absolute inset-0 bg-gradient-to-br from-white to-green-100" />
-        )}
-
-        {elements.map(
-          renderElement
-        )}
-      </div>
-    );
-  }
-
-  /* =========================
-     PDF
-  ========================= */
+    if (b) {
+      try {
+        setBackElements(JSON.parse(b));
+      } catch {}
+    }
+  }, []);
 
   async function generatePDF() {
-    if (!frontRef.current || !backRef.current) {
-      return;
-    }
+    if (!cardRef.current || !member) return;
 
-    try {
-      const frontCanvas =
-        await html2canvas(
-          frontRef.current,
-          {
-            scale: 4,
-            useCORS: true,
-          }
-        );
-
-      const backCanvas =
-        await html2canvas(
-          backRef.current,
-          {
-            scale: 4,
-            useCORS: true,
-          }
-        );
-
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: [85.6, 53.9],
+    const canvas =
+      await html2canvas(cardRef.current, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: "#ffffff",
       });
 
-      pdf.addImage(
-        frontCanvas.toDataURL(
-          "image/png"
-        ),
-        "PNG",
-        0,
-        0,
-        85.6,
-        53.9
-      );
+    const image =
+      canvas.toDataURL("image/png");
 
-      pdf.addPage(
-        [85.6, 53.9],
-        "landscape"
-      );
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: [85.6, 53.9],
+    });
 
-      pdf.addImage(
-        backCanvas.toDataURL(
-          "image/png"
-        ),
-        "PNG",
-        0,
-        0,
-        85.6,
-        53.9
-      );
+    pdf.addImage(
+      image,
+      "PNG",
+      0,
+      0,
+      85.6,
+      53.9
+    );
 
-      pdf.save(
-        `${member?.membership_no || "member"}-PVC.pdf`
-      );
-    } catch (error) {
-      console.error(error);
-      alert("PDF generation failed.");
-    }
+    pdf.save(
+      `${member.membership_no || "member"}-PVC.pdf`
+    );
   }
 
-  /* =========================
-     LOADING
-  ========================= */
+  function addQRCodeElement() {
+    if (locked || !qr) return;
+
+    const element: CardElement = {
+      id: crypto.randomUUID(),
+      type: "image",
+      src: qr,
+      x: 75,
+      y: 60,
+      width: 18,
+      height: 25,
+    };
+
+    setFrontElements([
+      ...frontElements,
+      element,
+    ]);
+
+    setSide("front");
+    setSelectedId(element.id);
+  }
 
   if (!member) {
     return (
       <main className="p-10">
-        Loading card designer...
+        Member loading...
       </main>
     );
   }
 
-  /* =========================
-     UI
-  ========================= */
-
   return (
-    <main className="min-h-screen bg-slate-100 p-4">
+    <main className="min-h-screen bg-slate-100">
 
-      <div className="max-w-[1400px] mx-auto">
+      <header className="bg-white border-b p-4 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex flex-wrap gap-3 justify-between items-center">
 
-        {/* HEADER */}
-
-        <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
-
-          <div>
-            <h1 className="text-2xl font-bold">
-              PVC Card Designer
-            </h1>
-
-            <p className="text-sm text-slate-500">
-              Front + Back •
-              85.6 × 53.9 mm
-            </p>
-          </div>
+          <h1 className="text-xl font-bold">
+            PVC Card Designer
+          </h1>
 
           <div className="flex gap-2">
 
             <button
-              onClick={() => {
-                setLocked(
-                  !locked
-                );
-
-                if (!locked) {
-                  saveDesign();
-                }
-              }}
-              className="bg-slate-900 text-white px-4 py-2 rounded-xl"
+              onClick={() =>
+                setLocked(!locked)
+              }
+              className="px-4 py-2 rounded-xl bg-slate-900 text-white"
             >
               {locked
-                ? "🔓 Unlock"
+                ? "🔓 Unlock Design"
                 : "🔒 Lock Design"}
             </button>
 
             <button
-              onClick={saveDesign}
-              disabled={locked}
-              className="bg-white border px-4 py-2 rounded-xl disabled:opacity-50"
+              onClick={saveTemplate}
+              className="px-4 py-2 rounded-xl bg-blue-600 text-white"
             >
-              💾 Save
+              Save Design
             </button>
 
             <button
               onClick={generatePDF}
-              className="bg-green-600 text-white px-4 py-2 rounded-xl"
+              className="px-4 py-2 rounded-xl bg-green-600 text-white"
             >
-              📄 Generate PDF
+              Generate PDF
             </button>
 
           </div>
         </div>
+      </header>
 
-        {/* SIDE SWITCH */}
+      <div className="max-w-7xl mx-auto p-5 grid lg:grid-cols-[1fr_380px] gap-6">
 
-        <div className="flex gap-2 mb-5">
+        {/* CARD AREA */}
 
-          <button
-            onClick={() =>
-              setSide("front")
-            }
-            className={`px-5 py-2 rounded-xl ${
-              side === "front"
-                ? "bg-blue-600 text-white"
-                : "bg-white border"
-            }`}
-          >
-            Front
-          </button>
+        <section>
 
-          <button
-            onClick={() =>
-              setSide("back")
-            }
-            className={`px-5 py-2 rounded-xl ${
-              side === "back"
-                ? "bg-blue-600 text-white"
-                : "bg-white border"
-            }`}
-          >
-            Back
-          </button>
+          <div className="flex gap-2 mb-4">
 
-        </div>
-
-        {/* MAIN */}
-
-        <div className="grid lg:grid-cols-[1fr_380px] gap-6">
-
-          {/* FIXED CARD AREA */}
-
-          <div className="overflow-auto bg-slate-200 rounded-2xl p-5">
-
-            <div
-              className="mx-auto"
-              style={{
-                width: CARD_WIDTH,
-                height: CARD_HEIGHT,
-              }}
+            <button
+              onClick={() => setSide("front")}
+              className={`px-4 py-2 rounded-xl ${
+                side === "front"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white"
+              }`}
             >
-              <CardPreview />
-            </div>
+              Front
+            </button>
+
+            <button
+              onClick={() => setSide("back")}
+              className={`px-4 py-2 rounded-xl ${
+                side === "back"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white"
+              }`}
+            >
+              Back
+            </button>
 
           </div>
 
-          {/* EDIT PANEL */}
+          <div
+            ref={cardRef}
+            className="relative w-full max-w-[700px] aspect-[85.6/53.9] mx-auto bg-white rounded-2xl overflow-hidden shadow-2xl border"
+            style={{
+              background:
+                "linear-gradient(135deg,#ffffff,#dcfce7)",
+            }}
+          >
 
-          <div className="bg-white rounded-2xl shadow">
+            {elements.map((el) => (
 
-            <div className="p-5 border-b">
-
-              <h2 className="text-lg font-bold">
-                Edit Panel
-              </h2>
-
-              <p className="text-sm text-slate-500">
-                Card fixed • ಈ panel ಮಾತ್ರ scroll ಆಗುತ್ತದೆ
-              </p>
-
-            </div>
-
-            <div className="max-h-[75vh] overflow-y-auto p-5">
-
-              {/* TITLE */}
-
-              <label className="font-semibold block">
-                Card Title
-              </label>
-
-              <input
-                value={title}
-                onChange={(e) =>
-                  setTitle(
-                    e.target.value
-                  )
+              <div
+                key={el.id}
+                onMouseDown={(e) =>
+                  startDrag(e, el)
                 }
-                disabled={locked}
-                className="w-full border rounded-xl p-3 mt-2"
-              />
-
-              {/* ADD */}
-
-              <button
                 onClick={() =>
-                  setShowAdd(
-                    !showAdd
-                  )
+                  setSelectedId(el.id)
                 }
-                disabled={locked}
-                className="w-full border rounded-xl p-3 mt-4 font-semibold disabled:opacity-50"
+                className={`absolute cursor-move ${
+                  selectedId === el.id &&
+                  !locked
+                    ? "ring-2 ring-blue-500"
+                    : ""
+                }`}
+                style={{
+                  left: `${el.x}%`,
+                  top: `${el.y}%`,
+                  width: `${el.width}%`,
+                  height: `${el.height}%`,
+                  fontSize: `${el.fontSize || 10}px`,
+                  fontWeight: el.bold
+                    ? "bold"
+                    : "normal",
+                  zIndex: 10,
+                }}
               >
-                + Add Text / Image
-              </button>
 
-              {showAdd && !locked && (
-                <div className="bg-slate-50 border rounded-xl p-4 mt-3">
-
-                  <input
-                    value={newText}
-                    onChange={(e) =>
-                      setNewText(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Text / ಪಠ್ಯ"
-                    className="w-full border rounded-lg p-3"
+                {el.type === "text" ? (
+                  editingId === el.id &&
+                  !locked ? (
+                    <textarea
+                      autoFocus
+                      value={el.text || ""}
+                      onChange={(e) =>
+                        updateElement(
+                          el.id,
+                          {
+                            text: e.target.value,
+                          }
+                        )
+                      }
+                      onBlur={() =>
+                        setEditingId(null)
+                      }
+                      className="w-full h-full bg-white/90 border p-1 resize-none"
+                    />
+                  ) : (
+                    <div
+                      onDoubleClick={() =>
+                        !locked &&
+                        setEditingId(el.id)
+                      }
+                      className="w-full h-full whitespace-pre-wrap"
+                    >
+                      {getValue(
+                        el.text || ""
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <img
+                    src={el.src}
+                    className="w-full h-full object-contain pointer-events-none"
+                    alt=""
                   />
-
-                  <button
-                    onClick={addText}
-                    className="w-full bg-blue-600 text-white rounded-lg p-3 mt-3"
-                  >
-                    + Add Text
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      imageInput.current?.click()
-                    }
-                    className="w-full bg-purple-600 text-white rounded-lg p-3 mt-3"
-                  >
-                    🖼️ Add Image / Logo
-                  </button>
-
-                  <input
-                    ref={imageInput}
-                    type="file"
-                    accept="image/*"
-                    onChange={uploadImage}
-                    className="hidden"
-                  />
-
-                </div>
-              )}
-
-              {/* ELEMENTS */}
-
-              <div className="mt-6">
-
-                <h3 className="font-bold">
-                  {side === "front"
-                    ? "Front Elements"
-                    : "Back Elements"}
-                </h3>
-
-                <div className="grid gap-2 mt-3">
-
-                  {elements
-                    .filter(
-                      (x) =>
-                        x.side === side
-                    )
-                    .map((element) => (
-                      <button
-                        key={element.id}
-                        onClick={() =>
-                          setSelectedId(
-                            element.id
-                          )
-                        }
-                        className={`text-left border rounded-lg p-3 ${
-                          selectedId ===
-                          element.id
-                            ? "border-blue-500 bg-blue-50"
-                            : ""
-                        }`}
-                      >
-                        {element.type ===
-                        "text"
-                          ? `📝 ${element.text}`
-                          : "🖼️ Image / Logo"}
-                      </button>
-                    ))}
-
-                </div>
+                )}
 
               </div>
 
-              {/* EDIT SELECTED */}
+            ))}
 
-              {selected && (
-                <div className="mt-6 border rounded-2xl p-4">
+          </div>
 
-                  <h3 className="font-bold">
-                    ✏️ Edit Element
-                  </h3>
+          <p className="text-center mt-3 text-sm text-gray-500">
+            Double-click text → edit
+            <br />
+            Drag → position change
+          </p>
 
-                  {selected.type ===
-                    "text" && (
-                    <>
-                      <label className="block font-semibold mt-4">
-                        Text
-                      </label>
+        </section>
 
+        {/* EDITOR */}
+
+        <aside className="bg-white rounded-2xl shadow p-5 h-[calc(100vh-120px)] overflow-y-auto">
+
+          <h2 className="font-bold text-lg">
+            Template Controls
+          </h2>
+
+          <p className="text-sm text-gray-500 mt-2">
+            {locked
+              ? "🔒 Design locked"
+              : "✏️ Editing enabled"}
+          </p>
+
+          <div className="grid gap-3 mt-5">
+
+            <button
+              disabled={locked}
+              onClick={addText}
+              className="border rounded-xl p-3 disabled:opacity-40"
+            >
+              + Add Text
+            </button>
+
+            <button
+              disabled={locked}
+              onClick={addImage}
+              className="border rounded-xl p-3 disabled:opacity-40"
+            >
+              + Add Image / Logo
+            </button>
+
+            <button
+              disabled={locked}
+              onClick={addQRCodeElement}
+              className="border rounded-xl p-3 disabled:opacity-40"
+            >
+              + Add QR Code
+            </button>
+
+            <button
+              disabled={
+                locked || !selectedId
+              }
+              onClick={deleteSelected}
+              className="border border-red-300 text-red-600 rounded-xl p-3 disabled:opacity-40"
+            >
+              Delete Selected
+            </button>
+
+          </div>
+
+          {/* SELECTED ELEMENT */}
+
+          {selectedId && (
+            <div className="mt-6 border-t pt-5">
+
+              <h3 className="font-bold mb-3">
+                Edit Selected
+              </h3>
+
+              {(() => {
+                const selected =
+                  elements.find(
+                    (x) =>
+                      x.id === selectedId
+                  );
+
+                if (!selected)
+                  return null;
+
+                return (
+                  <div className="grid gap-3">
+
+                    {selected.type ===
+                      "text" && (
                       <textarea
+                        disabled={locked}
                         value={
-                          selected.text ||
-                          ""
+                          selected.text || ""
                         }
                         onChange={(e) =>
                           updateElement(
                             selected.id,
                             {
-                              text: e.target
-                                .value,
+                              text:
+                                e.target.value,
                             }
                           )
                         }
-                        className="w-full border rounded-xl p-3 mt-2"
-                        rows={3}
+                        className="border rounded-xl p-3 min-h-[100px]"
                       />
+                    )}
 
-                      <label className="block font-semibold mt-4">
-                        Font Size
-                      </label>
-
+                    <label>
+                      X Position
                       <input
+                        disabled={locked}
                         type="range"
-                        min="8"
-                        max="60"
+                        min="0"
+                        max="90"
+                        value={selected.x}
+                        onChange={(e) =>
+                          updateElement(
+                            selected.id,
+                            {
+                              x: Number(
+                                e.target.value
+                              ),
+                            }
+                          )
+                        }
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label>
+                      Y Position
+                      <input
+                        disabled={locked}
+                        type="range"
+                        min="0"
+                        max="90"
+                        value={selected.y}
+                        onChange={(e) =>
+                          updateElement(
+                            selected.id,
+                            {
+                              y: Number(
+                                e.target.value
+                              ),
+                            }
+                          )
+                        }
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label>
+                      Width
+                      <input
+                        disabled={locked}
+                        type="range"
+                        min="5"
+                        max="90"
                         value={
-                          selected.fontSize ||
-                          20
+                          selected.width
                         }
                         onChange={(e) =>
                           updateElement(
                             selected.id,
                             {
-                              fontSize:
+                              width:
                                 Number(
-                                  e.target
-                                    .value
+                                  e.target.value
                                 ),
                             }
                           )
                         }
                         className="w-full"
                       />
+                    </label>
 
-                      <label className="flex gap-2 items-center mt-4">
-                        <input
-                          type="checkbox"
-                          checked={
-                            selected.bold ||
-                            false
-                          }
-                          onChange={(e) =>
-                            updateElement(
-                              selected.id,
-                              {
-                                bold:
-                                  e.target
-                                    .checked,
-                              }
-                            )
-                          }
-                        />
-                        Bold
-                      </label>
-
-                      <label className="block font-semibold mt-4">
-                        Color
-                      </label>
-
+                    <label>
+                      Height
                       <input
-                        type="color"
+                        disabled={locked}
+                        type="range"
+                        min="5"
+                        max="80"
                         value={
-                          selected.color ||
-                          "#111827"
+                          selected.height
                         }
                         onChange={(e) =>
                           updateElement(
                             selected.id,
                             {
-                              color:
-                                e.target
-                                  .value,
+                              height:
+                                Number(
+                                  e.target.value
+                                ),
                             }
                           )
                         }
-                        className="w-full h-12 mt-2"
+                        className="w-full"
                       />
+                    </label>
 
-                      <label className="block font-semibold mt-4">
-                        Alignment
-                      </label>
-
-                      <select
-                        value={
-                          selected.align ||
-                          "left"
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              align:
-                                e.target
-                                  .value as
-                                  | "left"
-                                  | "center"
-                                  | "right",
+                    {selected.type ===
+                      "text" && (
+                      <>
+                        <label>
+                          Font Size
+                          <input
+                            disabled={locked}
+                            type="range"
+                            min="6"
+                            max="32"
+                            value={
+                              selected.fontSize ||
+                              10
                             }
-                          )
-                        }
-                        className="w-full border rounded-xl p-3 mt-2"
-                      >
-                        <option value="left">
-                          Left
-                        </option>
-                        <option value="center">
-                          Center
-                        </option>
-                        <option value="right">
-                          Right
-                        </option>
-                      </select>
-                    </>
-                  )}
+                            onChange={(e) =>
+                              updateElement(
+                                selected.id,
+                                {
+                                  fontSize:
+                                    Number(
+                                      e.target
+                                        .value
+                                    ),
+                                }
+                              )
+                            }
+                            className="w-full"
+                          />
+                        </label>
 
-                  <label className="block font-semibold mt-4">
-                    Width
-                  </label>
+                        <label className="flex gap-2">
+                          <input
+                            disabled={locked}
+                            type="checkbox"
+                            checked={
+                              selected.bold ||
+                              false
+                            }
+                            onChange={(e) =>
+                              updateElement(
+                                selected.id,
+                                {
+                                  bold:
+                                    e.target
+                                      .checked,
+                                }
+                              )
+                            }
+                          />
+                          Bold
+                        </label>
+                      </>
+                    )}
 
-                  <input
-                    type="range"
-                    min="40"
-                    max="700"
-                    value={
-                      selected.width
-                    }
-                    onChange={(e) =>
-                      updateElement(
-                        selected.id,
-                        {
-                          width:
-                            Number(
-                              e.target
-                                .value
-                            ),
-                        }
-                      )
-                    }
-                    className="w-full"
-                  />
-
-                  <label className="block font-semibold mt-4">
-                    Height
-                  </label>
-
-                  <input
-                    type="range"
-                    min="30"
-                    max="500"
-                    value={
-                      selected.height
-                    }
-                    onChange={(e) =>
-                      updateElement(
-                        selected.id,
-                        {
-                          height:
-                            Number(
-                              e.target
-                                .value
-                            ),
-                        }
-                      )
-                    }
-                    className="w-full"
-                  />
-
-                  <button
-                    onClick={() =>
-                      deleteElement(
-                        selected.id
-                      )
-                    }
-                    className="w-full bg-red-600 text-white rounded-xl p-3 mt-5"
-                  >
-                    🗑️ Delete
-                  </button>
-
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
             </div>
+          )}
 
-          </div>
+          {message && (
+            <div className="mt-5 bg-green-50 text-green-700 p-3 rounded-xl">
+              {message}
+            </div>
+          )}
 
-        </div>
-
-        {/* HIDDEN FULL SIZE CARDS FOR PDF */}
-
-        <div
-          style={{
-            position: "fixed",
-            left: "-10000px",
-            top: 0,
-          }}
-        >
-          <div ref={frontRef}>
-            <CardPDF side="front" />
-          </div>
-
-          <div ref={backRef}>
-            <CardPDF side="back" />
-          </div>
-        </div>
+        </aside>
 
       </div>
-
     </main>
   );
-
-  /* =========================
-     PDF CARD
-  ========================= */
-
-  function CardPDF({
-    side: pdfSide,
-  }: {
-    side: Side;
-  }) {
-    return (
-      <div
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          position: "relative",
-          background:
-            pdfSide === "front"
-              ? "linear-gradient(135deg,#ffffff 35%,#dcfce7)"
-              : "linear-gradient(135deg,#ffffff,#dcfce7)",
-          overflow: "hidden",
-        }}
-      >
-        {pdfSide === "front" && (
-          <>
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                width: "100%",
-                height: 110,
-                background:
-                  "linear-gradient(90deg,#15803d,#1d4ed8)",
-              }}
-            />
-
-            {member?.photo_url && (
-              <img
-                src={member.photo_url}
-                crossOrigin="anonymous"
-                style={{
-                  position: "absolute",
-                  left: 40,
-                  top: 145,
-                  width: 130,
-                  height: 165,
-                  objectFit: "cover",
-                }}
-                alt=""
-              />
-            )}
-
-            {qr && (
-              <img
-                src={qr}
-                style={{
-                  position: "absolute",
-                  right: 40,
-                  top: 155,
-                  width: 125,
-                  height: 125,
-                }}
-                alt=""
-              />
-            )}
-          </>
-        )}
-
-        {elements
-          .filter(
-            (x) => x.side === pdfSide
-          )
-          .map((element) => (
-            <div
-              key={element.id}
-              style={{
-                position: "absolute",
-                left: element.x,
-                top: element.y,
-                width: element.width,
-                height: element.height,
-                fontSize:
-                  element.fontSize ||
-                  20,
-                fontWeight:
-                  element.bold
-                    ? 700
-                    : 400,
-                color:
-                  element.color ||
-                  "#111827",
-                textAlign:
-                  element.align ||
-                  "left",
-              }}
-            >
-              {element.type ===
-              "text" ? (
-                displayText(
-                  element.text || ""
-                )
-              ) : (
-                element.src && (
-                  <img
-                    src={element.src}
-                    crossOrigin="anonymous"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit:
-                        "contain",
-                    }}
-                    alt=""
-                  />
-                )
-              )}
-            </div>
-          ))}
-      </div>
-    );
-  }
 }
 
 export default function CardPage() {
@@ -1417,11 +862,11 @@ export default function CardPage() {
     <Suspense
       fallback={
         <main className="p-10">
-          Loading card designer...
+          Loading...
         </main>
       }
     >
-      <Card />
+      <CardDesigner />
     </Suspense>
   );
 }
