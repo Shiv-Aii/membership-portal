@@ -1,74 +1,150 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+
+type Application = {
+  id: string;
+  name: string | null;
+  designation: string | null;
+  mobile: string | null;
+  village: string | null;
+  taluk: string | null;
+  district: string | null;
+  photo_url: string | null;
+};
+
+type PublicPage = {
+  id?: string;
+  member_id: string;
+  title: string;
+  description: string;
+  image_url: string;
+  phone: string;
+  address: string;
+  website: string;
+  is_active: boolean;
+};
 
 function PublicPageEditor() {
-  const params = useSearchParams();
-  const memberId = params.get("id");
+  const searchParams = useSearchParams();
 
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    image_url: "",
-    phone: "",
-    address: "",
-    website: "",
-    is_active: true,
-  });
+  const applicationId = searchParams.get("id");
+
+  const [member, setMember] = useState<Application | null>(null);
+  const [page, setPage] = useState<PublicPage | null>(null);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [website, setWebsite] = useState("");
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function load() {
-      if (!memberId) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("member_info_page")
-        .select("*")
-        .eq("member_id", memberId)
-        .maybeSingle();
-
-      if (error) {
-        console.error(error);
-      }
-
-      if (data) {
-        setForm({
-          title: data.title || "",
-          description: data.description || "",
-          image_url: data.image_url || "",
-          phone: data.phone || "",
-          address: data.address || "",
-          website: data.website || "",
-          is_active: data.is_active ?? true,
-        });
-      }
-
+    if (!applicationId) {
       setLoading(false);
+      return;
     }
 
-    load();
-  }, [memberId]);
+    loadData();
+  }, [applicationId]);
 
-  function updateField(
-    field: string,
-    value: string | boolean
-  ) {
-    setForm((old) => ({
-      ...old,
-      [field]: value,
-    }));
+  async function loadData() {
+    if (!applicationId) return;
+
+    setLoading(true);
+
+    const { data: application, error: applicationError } =
+      await supabase
+        .from("applications")
+        .select("*")
+        .eq("id", applicationId)
+        .single();
+
+    if (applicationError) {
+      console.error(applicationError);
+      setMessage("Member ಮಾಹಿತಿ ಸಿಗಲಿಲ್ಲ.");
+      setLoading(false);
+      return;
+    }
+
+    setMember(application);
+
+    const { data: publicPage } = await supabase
+      .from("member_info_page")
+      .select("*")
+      .eq("member_id", applicationId)
+      .maybeSingle();
+
+    if (publicPage) {
+      setPage(publicPage);
+
+      setTitle(publicPage.title || "");
+      setDescription(publicPage.description || "");
+      setImageUrl(publicPage.image_url || "");
+      setPhone(publicPage.phone || "");
+      setAddress(publicPage.address || "");
+      setWebsite(publicPage.website || "");
+    } else {
+      setTitle(`${application.name || ""} - Public Page`);
+      setDescription(
+        `${application.name || ""}\n${application.designation || ""}`
+      );
+      setImageUrl(application.photo_url || "");
+      setPhone(application.mobile || "");
+
+      setAddress(
+        [
+          application.village,
+          application.taluk,
+          application.district,
+        ]
+          .filter(Boolean)
+          .join(", ")
+      );
+    }
+
+    setLoading(false);
+  }
+
+  async function uploadImage() {
+    if (!imageFile) return imageUrl;
+
+    const extension =
+      imageFile.name.split(".").pop() || "jpg";
+
+    const fileName = `public-page/${applicationId}-${Date.now()}.${extension}`;
+
+    const { error } = await supabase.storage
+      .from("member-photos")
+      .upload(fileName, imageFile, {
+        upsert: true,
+        contentType: imageFile.type,
+      });
+
+    if (error) {
+      console.error(error);
+      throw new Error("Image upload failed");
+    }
+
+    const { data } = supabase.storage
+      .from("member-photos")
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
   }
 
   async function savePage() {
-    if (!memberId) {
+    if (!applicationId) {
       setMessage("Member ID ಸಿಗಲಿಲ್ಲ.");
       return;
     }
@@ -76,55 +152,121 @@ function PublicPageEditor() {
     setSaving(true);
     setMessage("");
 
-    const { error } = await supabase
-      .from("member_info_page")
-      .upsert(
-        {
-          member_id: memberId,
-          title: form.title,
-          description: form.description,
-          image_url: form.image_url,
-          phone: form.phone,
-          address: form.address,
-          website: form.website,
-          is_active: form.is_active,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "member_id",
-        }
+    try {
+      const finalImageUrl = await uploadImage();
+
+      const payload = {
+        member_id: applicationId,
+        title,
+        description,
+        image_url: finalImageUrl,
+        phone,
+        address,
+        website,
+        is_active: page?.is_active ?? true,
+      };
+
+      if (page?.id) {
+        const { error } = await supabase
+          .from("member_info_page")
+          .update(payload)
+          .eq("id", page.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("member_info_page")
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setPage(data);
+      }
+
+      setImageUrl(finalImageUrl);
+
+      setMessage(
+        "✅ Public Page successfully saved!"
       );
+    } catch (error) {
+      console.error(error);
+
+      setMessage(
+        "❌ Save ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      );
+    }
 
     setSaving(false);
+  }
 
-    if (error) {
-      console.error(error);
-      setMessage("Save failed: " + error.message);
+  async function togglePublish() {
+    if (!page?.id) {
+      setMessage(
+        "ಮೊದಲು Save Public Page ಮಾಡಿ."
+      );
       return;
     }
 
-    setMessage("Public Page saved successfully ✅");
+    const newStatus = !page.is_active;
+
+    const { error } = await supabase
+      .from("member_info_page")
+      .update({
+        is_active: newStatus,
+      })
+      .eq("id", page.id);
+
+    if (error) {
+      console.error(error);
+
+      setMessage(
+        "Publish status update ಆಗಲಿಲ್ಲ."
+      );
+
+      return;
+    }
+
+    setPage({
+      ...page,
+      is_active: newStatus,
+    });
+
+    setMessage(
+      newStatus
+        ? "🟢 Public Page Published!"
+        : "🔴 Public Page Unpublished!"
+    );
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen grid place-items-center">
-        Loading...
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="bg-white p-10 rounded-3xl shadow-xl">
+          Loading...
+        </div>
       </main>
     );
   }
 
-  if (!memberId) {
+  if (!applicationId || !member) {
     return (
-      <main className="min-h-screen bg-slate-100 grid place-items-center p-5">
-        <div className="bg-white rounded-2xl shadow p-8 text-center">
-          <h1 className="text-xl font-bold">
-            Member ID ಸಿಗಲಿಲ್ಲ
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-xl text-center">
+
+          <div className="text-5xl mb-4">
+            ⚠️
+          </div>
+
+          <h1 className="text-2xl font-bold">
+            Member ಆಯ್ಕೆ ಆಗಿಲ್ಲ
           </h1>
 
-          <p className="text-gray-500 mt-2">
-            Public Page Editor ಅನ್ನು member ID ಜೊತೆಗೆ ತೆರೆಯಬೇಕು.
+          <p className="text-slate-500 mt-3">
+            Dashboard ನಿಂದ member Public Page ತೆರೆಯಿರಿ.
           </p>
+
         </div>
       </main>
     );
@@ -132,252 +274,325 @@ function PublicPageEditor() {
 
   return (
     <main className="min-h-screen bg-slate-100 p-5">
+
       <div className="max-w-6xl mx-auto">
 
-        <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">
-              Public Page Editor
-            </h1>
+        {/* HEADER */}
 
-            <p className="text-gray-500 mt-1">
-              QR scan ಮಾಡಿದಾಗ ತೆರೆಯುವ separate page
-            </p>
+        <div className="bg-white rounded-3xl shadow-lg p-6 mb-5">
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+            <div>
+
+              <h1 className="text-3xl font-bold">
+                Public Page Editor
+              </h1>
+
+              <p className="text-slate-500 mt-1">
+                ಸಾರ್ವಜನಿಕ ಸದಸ್ಯ ಪುಟ
+              </p>
+
+            </div>
+
+            <div className="flex gap-2">
+
+              <button
+                onClick={savePage}
+                disabled={saving}
+                className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50"
+              >
+                {saving
+                  ? "Saving..."
+                  : "💾 Save Page"}
+              </button>
+
+              <button
+                onClick={togglePublish}
+                className={`px-6 py-3 rounded-xl text-white font-semibold ${
+                  page?.is_active
+                    ? "bg-red-600"
+                    : "bg-green-600"
+                }`}
+              >
+                {page?.is_active
+                  ? "🔴 Unpublish"
+                  : "🟢 Publish"}
+              </button>
+
+            </div>
+
           </div>
 
-          <button
-            onClick={savePage}
-            disabled={saving}
-            className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save & Publish"}
-          </button>
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_400px] gap-6">
+        {/* MEMBER INFO */}
 
-          {/* PREVIEW */}
+        <div className="bg-white rounded-3xl shadow-lg p-6 mb-5">
 
-          <section className="bg-slate-200 rounded-3xl p-5">
+          <h2 className="text-xl font-bold mb-4">
+            Member
+          </h2>
 
-            <h2 className="font-bold mb-4">
-              Live Preview
+          <div className="flex items-center gap-4">
+
+            {member.photo_url && (
+              <img
+                src={member.photo_url}
+                alt={member.name || ""}
+                className="w-20 h-20 rounded-2xl object-cover"
+              />
+            )}
+
+            <div>
+
+              <div className="text-xl font-bold">
+                {member.name}
+              </div>
+
+              <div className="text-slate-500">
+                {member.designation}
+              </div>
+
+              <div className="text-sm text-slate-400">
+                {member.mobile}
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-6">
+
+          {/* EDITOR */}
+
+          <div className="bg-white rounded-3xl shadow-lg p-6">
+
+            <h2 className="text-xl font-bold mb-5">
+              ✏️ Page Content
             </h2>
 
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+            <div className="space-y-5">
 
-              {form.image_url && (
+              {/* TITLE */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Title / ಶೀರ್ಷಿಕೆ
+                </label>
+
+                <input
+                  value={title}
+                  onChange={(e) =>
+                    setTitle(e.target.value)
+                  }
+                  placeholder="ಉದಾ: ನಮ್ಮ ಸಂಸ್ಥೆ"
+                  className="w-full border rounded-xl p-3"
+                />
+
+              </div>
+
+              {/* DESCRIPTION */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Description / ವಿವರ
+                </label>
+
+                <textarea
+                  value={description}
+                  onChange={(e) =>
+                    setDescription(e.target.value)
+                  }
+                  rows={7}
+                  placeholder="ಇಲ್ಲಿ ನಿಮಗೆ ಬೇಕಾದ text ಹಾಕಿ..."
+                  className="w-full border rounded-xl p-3 resize-none"
+                />
+
+              </div>
+
+              {/* IMAGE */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Image / Photo
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setImageFile(
+                      e.target.files?.[0] || null
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
+
+              </div>
+
+              {/* PHONE */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Phone / ಮೊಬೈಲ್
+                </label>
+
+                <input
+                  value={phone}
+                  onChange={(e) =>
+                    setPhone(e.target.value)
+                  }
+                  placeholder="Mobile Number"
+                  className="w-full border rounded-xl p-3"
+                />
+
+              </div>
+
+              {/* ADDRESS */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Address / ವಿಳಾಸ
+                </label>
+
+                <textarea
+                  value={address}
+                  onChange={(e) =>
+                    setAddress(e.target.value)
+                  }
+                  rows={3}
+                  className="w-full border rounded-xl p-3 resize-none"
+                />
+
+              </div>
+
+              {/* WEBSITE */}
+
+              <div>
+
+                <label className="block font-semibold mb-2">
+                  Website
+                </label>
+
+                <input
+                  value={website}
+                  onChange={(e) =>
+                    setWebsite(e.target.value)
+                  }
+                  placeholder="https://example.com"
+                  className="w-full border rounded-xl p-3"
+                />
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* LIVE PREVIEW */}
+
+          <div className="bg-white rounded-3xl shadow-lg p-6">
+
+            <h2 className="text-xl font-bold mb-5">
+              👁️ Live Preview
+            </h2>
+
+            <div className="border rounded-3xl overflow-hidden bg-white">
+
+              {imageUrl && (
                 <img
-                  src={form.image_url}
-                  alt=""
-                  className="w-full max-h-[400px] object-cover"
+                  src={imageUrl}
+                  alt="Preview"
+                  className="w-full h-56 object-cover"
                 />
               )}
 
-              <div className="p-7">
+              <div className="p-6">
 
-                <h2 className="text-3xl font-bold text-center">
-                  {form.title || "ನಿಮ್ಮ Page Title"}
-                </h2>
+                <h1 className="text-2xl font-bold">
+                  {title || "Page Title"}
+                </h1>
 
-                <div className="mt-6 text-gray-700 whitespace-pre-line leading-8">
-                  {form.description ||
-                    "ನಿಮ್ಮ information ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ."}
-                </div>
+                <p className="mt-4 text-slate-600 whitespace-pre-line">
+                  {description ||
+                    "ನಿಮ್ಮ description ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ."}
+                </p>
 
-                {form.phone && (
-                  <p className="mt-6">
-                    📞 {form.phone}
-                  </p>
+                {phone && (
+                  <div className="mt-5 p-3 bg-slate-50 rounded-xl">
+                    📞 {phone}
+                  </div>
                 )}
 
-                {form.address && (
-                  <p className="mt-3">
-                    📍 {form.address}
-                  </p>
+                {address && (
+                  <div className="mt-3 p-3 bg-slate-50 rounded-xl">
+                    📍 {address}
+                  </div>
                 )}
 
-                {form.website && (
-                  <p className="mt-3">
-                    🌐 {form.website}
-                  </p>
-                )}
-
-              </div>
-            </div>
-          </section>
-
-          {/* EDIT PANEL */}
-
-          <aside className="bg-white rounded-3xl shadow-xl">
-
-            <div className="p-5 border-b">
-              <h2 className="font-bold text-lg">
-                Edit Page
-              </h2>
-
-              <p className="text-sm text-gray-500 mt-1">
-                ಈ panel ಮಾತ್ರ scroll ಆಗುತ್ತದೆ.
-              </p>
-            </div>
-
-            <div className="max-h-[75vh] overflow-y-auto p-5">
-
-              <div className="grid gap-4">
-
-                <div>
-                  <label className="font-semibold">
-                    Page Title
-                  </label>
-
-                  <input
-                    value={form.title}
-                    onChange={(e) =>
-                      updateField(
-                        "title",
-                        e.target.value
-                      )
-                    }
-                    placeholder="ಸಂಸ್ಥೆಯ ಹೆಸರು"
-                    className="w-full border rounded-xl p-3 mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">
-                    Text / Description
-                  </label>
-
-                  <textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      updateField(
-                        "description",
-                        e.target.value
-                      )
-                    }
-                    placeholder="ನಿಮಗೆ ಬೇಕಾದ information ಇಲ್ಲಿ ಬರೆಯಿರಿ..."
-                    className="w-full border rounded-xl p-3 mt-2 min-h-[180px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">
-                    Image URL
-                  </label>
-
-                  <input
-                    value={form.image_url}
-                    onChange={(e) =>
-                      updateField(
-                        "image_url",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Image URL"
-                    className="w-full border rounded-xl p-3 mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">
-                    Phone
-                  </label>
-
-                  <input
-                    value={form.phone}
-                    onChange={(e) =>
-                      updateField(
-                        "phone",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Mobile / Phone"
-                    className="w-full border rounded-xl p-3 mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">
-                    Address
-                  </label>
-
-                  <textarea
-                    value={form.address}
-                    onChange={(e) =>
-                      updateField(
-                        "address",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Address"
-                    className="w-full border rounded-xl p-3 mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">
-                    Website
-                  </label>
-
-                  <input
-                    value={form.website}
-                    onChange={(e) =>
-                      updateField(
-                        "website",
-                        e.target.value
-                      )
-                    }
-                    placeholder="https://..."
-                    className="w-full border rounded-xl p-3 mt-2"
-                  />
-                </div>
-
-                <label className="flex items-center gap-3 border rounded-xl p-3">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) =>
-                      updateField(
-                        "is_active",
-                        e.target.checked
-                      )
-                    }
-                  />
-
-                  Public Page Active
-                </label>
-
-                <button
-                  onClick={savePage}
-                  disabled={saving}
-                  className="bg-green-600 text-white rounded-xl p-3 font-bold disabled:opacity-50"
-                >
-                  {saving
-                    ? "Saving..."
-                    : "Save & Publish"}
-                </button>
-
-                {message && (
-                  <div className="bg-green-50 text-green-700 rounded-xl p-3">
-                    {message}
+                {website && (
+                  <div className="mt-3 p-3 bg-blue-50 text-blue-700 rounded-xl">
+                    🌐 {website}
                   </div>
                 )}
 
               </div>
+
             </div>
-          </aside>
+
+            {/* STATUS */}
+
+            <div className="mt-5 p-4 rounded-xl bg-slate-50">
+
+              <div className="font-semibold">
+                Public Page Status
+              </div>
+
+              <div
+                className={`mt-2 font-bold ${
+                  page?.is_active
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {page?.is_active
+                  ? "🟢 Published"
+                  : "🔴 Not Published"}
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
+
+        {/* MESSAGE */}
+
+        {message && (
+          <div className="mt-5 bg-white rounded-2xl shadow p-4 text-center font-semibold">
+            {message}
+          </div>
+        )}
+
       </div>
+
     </main>
   );
 }
 
-export default function PublicPageAdmin() {
+export default function PublicPageEditorPage() {
   return (
     <Suspense
       fallback={
-        <main className="p-10">
+        <main className="min-h-screen flex items-center justify-center">
           Loading...
         </main>
       }
