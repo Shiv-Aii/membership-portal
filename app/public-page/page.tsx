@@ -23,7 +23,10 @@ export default function PublicPage() {
   useEffect(() => {
     async function loadPage() {
       try {
-        const params = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(
+          window.location.search
+        );
+
         const memberId = params.get("id");
 
         if (!memberId) {
@@ -32,20 +35,23 @@ export default function PublicPage() {
           return;
         }
 
-        const { data: page, error: dbError } = await supabase
-          .from("member_info_page")
-          .select(
-            "id, member_id, title, description, image_url, phone, address, website, is_active"
-          )
-          .eq("member_id", memberId)
-          .eq("is_active", true)
-          .maybeSingle();
+        const { data: page, error: dbError } =
+          await supabase
+            .from("member_info_page")
+            .select(
+              "id, member_id, title, description, image_url, phone, address, website, is_active"
+            )
+            .eq("member_id", memberId)
+            .eq("is_active", true)
+            .maybeSingle();
 
         if (dbError) {
           console.error(dbError);
           setError("Public Page load ಆಗಲಿಲ್ಲ.");
         } else if (!page) {
-          setError("ಈ ಸದಸ್ಯರಿಗೆ Public Page ಇನ್ನೂ publish ಆಗಿಲ್ಲ.");
+          setError(
+            "ಈ ಸದಸ್ಯರಿಗೆ Public Page ಇನ್ನೂ publish ಆಗಿಲ್ಲ."
+          );
         } else {
           setData(page);
         }
@@ -64,7 +70,10 @@ export default function PublicPage() {
     return (
       <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
         <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
-          <div className="text-xl font-bold">Loading...</div>
+          <div className="text-xl font-bold">
+            Loading...
+          </div>
+
           <p className="text-slate-500 mt-2">
             Public Page ತೆರೆಯಲಾಗುತ್ತಿದೆ
           </p>
@@ -77,7 +86,9 @@ export default function PublicPage() {
     return (
       <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
         <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 text-center">
-          <div className="text-6xl mb-5">⚠️</div>
+          <div className="text-6xl mb-5">
+            ⚠️
+          </div>
 
           <h1 className="text-3xl font-bold text-slate-900">
             Public Page
@@ -116,7 +127,7 @@ export default function PublicPage() {
             </div>
           )}
 
-          {/* Details */}
+          {/* Content */}
           <div className="p-6 md:p-8">
 
             {data.description && (
@@ -133,6 +144,7 @@ export default function PublicPage() {
 
             <div className="grid gap-4">
 
+              {/* Phone */}
               {data.phone && (
                 <a
                   href={`tel:${data.phone}`}
@@ -148,6 +160,7 @@ export default function PublicPage() {
                 </a>
               )}
 
+              {/* Address */}
               {data.address && (
                 <div className="border rounded-2xl p-4">
                   <div className="text-sm text-slate-500">
@@ -160,6 +173,7 @@ export default function PublicPage() {
                 </div>
               )}
 
+              {/* Website */}
               {data.website && (
                 <a
                   href={
