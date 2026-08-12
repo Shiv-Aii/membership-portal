@@ -13,10 +13,16 @@ import type {
 } from "react";
 
 import { supabase } from "@/lib/supabase";
+
 import QRCode from "qrcode";
+
 import html2canvas from "html2canvas";
+
 import jsPDF from "jspdf";
+
 import { useSearchParams } from "next/navigation";
+
+import AdminGuard from "@/components/AdminGuard";
 
 /* =========================================================
    TYPES
@@ -2999,16 +3005,30 @@ function CardDesigner() {
 
 export default function CardPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen bg-slate-100 flex items-center justify-center">
-          <div className="font-bold">
-            Loading PVC Designer...
-          </div>
-        </main>
-      }
-    >
-      <CardDesigner />
-    </Suspense>
+    <AdminGuard>
+      <Suspense
+        fallback={
+          <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-md p-8 text-center">
+
+              <div className="text-5xl">
+                🔐
+              </div>
+
+              <div className="font-bold text-xl mt-4">
+                Loading PVC Designer...
+              </div>
+
+              <p className="text-slate-500 mt-2">
+                ದಯವಿಟ್ಟು ಕಾಯಿರಿ...
+              </p>
+
+            </div>
+          </main>
+        }
+      >
+        <CardDesigner />
+      </Suspense>
+    </AdminGuard>
   );
 }
