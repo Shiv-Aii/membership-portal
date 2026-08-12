@@ -20,15 +20,20 @@ export default function Admin() {
   const [showRecycleBin, setShowRecycleBin] =
     useState(false);
 
-  // Membership number setting
+  // =====================================================
+  // MEMBERSHIP NUMBER SETTINGS
+  // =====================================================
+
   const [membershipStartNo, setMembershipStartNo] =
     useState("1");
 
-  const [savingMembershipStart, setSavingMembershipStart] =
-    useState(false);
+  const [
+    savingMembershipStart,
+    setSavingMembershipStart,
+  ] = useState(false);
 
   // =====================================================
-  // LOAD ALL APPLICATIONS
+  // LOAD APPLICATIONS
   // =====================================================
 
   async function load() {
@@ -43,47 +48,60 @@ export default function Admin() {
 
     if (error) {
       console.error(error);
-      alert(error.message);
+
+      alert(
+        "Applications load ಆಗಲಿಲ್ಲ:\n\n" +
+          error.message
+      );
+
       setApps([]);
     } else {
-      setApps((data || []) as Application[]);
+      setApps(
+        (data || []) as Application[]
+      );
     }
 
     setLoading(false);
   }
 
   // =====================================================
-  // LOAD MEMBERSHIP START NUMBER
+  // LOAD MEMBERSHIP SETTINGS
   // =====================================================
 
-  async function loadMembershipStartNumber() {
+  async function loadMembershipSettings() {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("membership_start_no")
+      .select(
+        "membership_start_no, next_membership_no"
+      )
       .eq("id", 1)
       .maybeSingle();
 
     if (error) {
       console.error(
-        "Membership setting load error:",
+        "Membership settings error:",
         error
       );
+
       return;
     }
 
     if (
-      data &&
-      data.membership_start_no !== null &&
-      data.membership_start_no !== undefined
+      data?.membership_start_no !==
+      null &&
+      data?.membership_start_no !==
+      undefined
     ) {
       setMembershipStartNo(
-        String(data.membership_start_no)
+        String(
+          data.membership_start_no
+        )
       );
     }
   }
 
   // =====================================================
-  // AUTH
+  // ADMIN AUTH
   // =====================================================
 
   useEffect(() => {
@@ -92,13 +110,16 @@ export default function Admin() {
         await supabase.auth.getUser();
 
       if (!data.user) {
-        router.replace("/admin/login");
+        router.replace(
+          "/admin/login"
+        );
+
         return;
       }
 
       await Promise.all([
         load(),
-        loadMembershipStartNumber(),
+        loadMembershipSettings(),
       ]);
     }
 
@@ -113,7 +134,8 @@ export default function Admin() {
     const value =
       membershipStartNo.trim();
 
-    const number = Number(value);
+    const number =
+      Number(value);
 
     if (
       !value ||
@@ -123,51 +145,124 @@ export default function Admin() {
       alert(
         "ದಯವಿಟ್ಟು 1 ಅಥವಾ ಅದಕ್ಕಿಂತ ದೊಡ್ಡ ಪೂರ್ಣ ಸಂಖ್ಯೆ ಹಾಕಿ."
       );
+
       return;
     }
 
     setSavingMembershipStart(true);
 
     try {
+      /*
+       * ಮುಖ್ಯ:
+       *
+       * membership_start_no = ನೀವು ಆಯ್ಕೆ ಮಾಡಿದ starting number
+       *
+       * next_membership_no = ಮುಂದಿನ ಹೊಸ memberಗೆ
+       * ಕೊಡಬೇಕಾದ number
+       *
+       * ಉದಾಹರಣೆ:
+       * 10 ಹಾಕಿದರೆ
+       *
+       * membership_start_no = 10
+       * next_membership_no = 10
+       */
+
       const { error } =
         await supabase
           .from("site_settings")
           .update({
-            membership_start_no: number,
+            membership_start_no:
+              number,
+
+            next_membership_no:
+              number,
           })
           .eq("id", 1);
 
       if (error) {
         alert(
-          "Starting Membership Number save ಆಗಲಿಲ್ಲ:\n\n" +
+          "Membership Number save ಆಗಲಿಲ್ಲ:\n\n" +
             error.message
         );
+
         return;
       }
 
       alert(
-        `Membership Number starting number ${number} ಆಗಿ save ಆಯಿತು ✅`
+        `Starting Membership Number ${number} ಆಗಿ save ಆಯಿತು ✅\n\nಹೊಸ memberಗೆ ${number} ರಿಂದ ಆರಂಭವಾಗುತ್ತದೆ.`
       );
     } finally {
-      setSavingMembershipStart(false);
+      setSavingMembershipStart(
+        false
+      );
     }
+  }
+
+  // =====================================================
+  // GET NEXT MEMBERSHIP NUMBER
+  // =====================================================
+
+  async function getNextMembershipNumber() {
+    const { data, error } =
+      await supabase
+        .from("site_settings")
+        .select(
+          "next_membership_no, membership_start_no"
+        )
+        .eq("id", 1)
+        .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Membership number load error:",
+        error
+      );
+
+      return String(
+        Number(
+          membershipStartNo
+        ) || 1
+      );
+    }
+
+    /*
+     * ಮೊದಲು next_membership_no ಬಳಸುತ್ತದೆ.
+     *
+     * ಹಳೆಯ 6165 ನೋಡಿ 6166 ಮಾಡುವುದಿಲ್ಲ.
+     */
+
+    const next =
+      Number(
+        data?.next_membership_no
+      ) ||
+      Number(
+        data?.membership_start_no
+      ) ||
+      Number(
+        membershipStartNo
+      ) ||
+      1;
+
+    return String(next);
   }
 
   // =====================================================
   // UPDATE APPLICATION
   // =====================================================
 
-  async function update(
+  async function updateApplication(
     id: string,
     patch: any
   ) {
-    const { error } = await supabase
-      .from("applications")
-      .update(patch)
-      .eq("id", id);
+    const { error } =
+      await supabase
+        .from("applications")
+        .update(patch)
+        .eq("id", id);
 
     if (error) {
       alert(error.message);
+
       return false;
     }
 
@@ -201,7 +296,7 @@ export default function Admin() {
       return false;
     }
 
-    // Existing page → simply activate
+    // Existing Public Page
     if (existing) {
       const {
         error: updateError,
@@ -214,7 +309,7 @@ export default function Admin() {
 
       if (updateError) {
         alert(
-          "Public Page active ಮಾಡಲಾಗಲಿಲ್ಲ:\n\n" +
+          "Public Page active ಆಗಲಿಲ್ಲ:\n\n" +
             updateError.message
         );
 
@@ -224,33 +319,40 @@ export default function Admin() {
       return true;
     }
 
-    // Create new page
+    // Address
     const address =
-      `${a.village || ""}, ${
-        a.taluk || ""
-      }, ${a.district || ""}`
-        .replace(
-          /^,\s*/,
-          ""
-        )
-        .replace(
-          /,\s*$/,
-          ""
-        );
+      [
+        a.village,
+        a.taluk,
+        a.district,
+      ]
+        .filter(Boolean)
+        .join(", ");
 
+    // Create new Public Page
     const { error } =
       await supabase
         .from("member_info_page")
         .insert({
           member_id: a.id,
-          title: "ಸದಸ್ಯರ ಮಾಹಿತಿ",
-          description: "",
+
+          title:
+            "ಸದಸ್ಯರ ಮಾಹಿತಿ",
+
+          description:
+            "",
+
           image_url:
             a.photo_url || "",
+
           phone:
             a.mobile || "",
+
           address,
-          website: "",
+
+          website:
+            "",
+
           is_active: true,
         });
 
@@ -267,76 +369,21 @@ export default function Admin() {
   }
 
   // =====================================================
-  // GET NEXT MEMBERSHIP NUMBER
-  // =====================================================
-
-  async function getNextMembershipNumber() {
-    const startNumber =
-      Number(
-        membershipStartNo
-      ) || 1;
-
-    const { data, error } =
-      await supabase
-        .from("applications")
-        .select(
-          "membership_no"
-        );
-
-    if (error) {
-      console.error(
-        "Membership number error:",
-        error
-      );
-
-      return String(
-        startNumber
-      );
-    }
-
-    let highest = startNumber - 1;
-
-    (data || []).forEach(
-      (row: any) => {
-        const value =
-          String(
-            row.membership_no ||
-              ""
-          ).trim();
-
-        if (!value) {
-          return;
-        }
-
-        const number =
-          Number(value);
-
-        if (
-          Number.isInteger(
-            number
-          ) &&
-          number > highest
-        ) {
-          highest = number;
-        }
-      }
-    );
-
-    return String(
-      Math.max(
-        startNumber,
-        highest + 1
-      )
-    );
-  }
-
-  // =====================================================
   // APPROVE MEMBER
   // =====================================================
 
   async function approve(
     a: any
   ) {
+    /*
+     * Databaseನಿಂದ next number ತೆಗೆದುಕೊಳ್ಳುತ್ತದೆ.
+     *
+     * ಉದಾಹರಣೆ:
+     * next_membership_no = 10
+     *
+     * Automatic next number = 10
+     */
+
     const automaticNext =
       await getNextMembershipNumber();
 
@@ -354,6 +401,7 @@ export default function Admin() {
       input.trim() ||
       automaticNext;
 
+    // Only numbers
     if (
       !/^\d+$/.test(
         membershipNumber
@@ -362,14 +410,16 @@ export default function Admin() {
       alert(
         "Membership Number numeric ಆಗಿರಬೇಕು."
       );
+
       return;
     }
 
-    // Check duplicate
+    // Duplicate check
     const duplicate =
       apps.find(
         (item: any) =>
           item.id !== a.id &&
+          item.is_deleted !== true &&
           item.membership_no &&
           String(
             item.membership_no
@@ -385,30 +435,51 @@ export default function Admin() {
       return;
     }
 
-    // Approve application
+    // =================================================
+    // APPROVE APPLICATION
+    // =================================================
+
     const { error } =
-      await supabase.rpc(
-        "approve_application",
-        {
-          p_id: a.id,
-          p_membership_no:
+      await supabase
+        .from("applications")
+        .update({
+          status:
+            "approved",
+
+          membership_no:
             membershipNumber,
-        }
-      );
+
+          is_deleted:
+            false,
+
+          deleted_at:
+            null,
+
+          deleted_by:
+            null,
+        })
+        .eq("id", a.id);
 
     if (error) {
       alert(
         "Approve ಆಗಲಿಲ್ಲ:\n\n" +
           error.message
       );
+
       return;
     }
 
-    // Create public page
+    // =================================================
+    // CREATE PUBLIC PAGE
+    // =================================================
+
     const publicPageCreated =
       await createPublicPage({
         ...a,
-        status: "approved",
+
+        status:
+          "approved",
+
         membership_no:
           membershipNumber,
       });
@@ -417,29 +488,45 @@ export default function Admin() {
       return;
     }
 
-    // Make sure member is active
-    const {
-      error: clearDeleteError,
-    } = await supabase
-      .from("applications")
-      .update({
-        is_deleted: false,
-        deleted_at: null,
-        deleted_by: null,
-      })
-      .eq("id", a.id);
+    // =================================================
+    // MOVE TO NEXT MEMBERSHIP NUMBER
+    // =================================================
 
-    if (clearDeleteError) {
-      alert(
-        clearDeleteError.message
+    const nextNumber =
+      Number(
+        membershipNumber
+      ) + 1;
+
+    const {
+      error: sequenceError,
+    } = await supabase
+      .from("site_settings")
+      .update({
+        next_membership_no:
+          nextNumber,
+      })
+      .eq("id", 1);
+
+    if (sequenceError) {
+      console.error(
+        "Membership sequence update failed:",
+        sequenceError
       );
+
+      alert(
+        "Member approve ಆಯಿತು, ಆದರೆ ಮುಂದಿನ Membership Number save ಆಗಲಿಲ್ಲ:\n\n" +
+          sequenceError.message
+      );
+
+      await load();
+
       return;
     }
 
     await load();
 
     alert(
-      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nPublic Page ready.`
+      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nಮುಂದಿನ number: ${nextNumber}`
     );
   }
 
@@ -459,31 +546,38 @@ export default function Admin() {
       return;
     }
 
-    await update(a.id, {
-      status: "rejected",
-    });
+    await updateApplication(
+      a.id,
+      {
+        status:
+          "rejected",
+      }
+    );
   }
 
   // =====================================================
-  // MOVE TO RECYCLE BIN
+  // DELETE → RECYCLE BIN
   // =====================================================
 
   async function moveToRecycleBin(
     a: any
   ) {
     if (
-      a.status !== "approved"
+      a.status !==
+      "approved"
     ) {
       alert(
         "Approved member ಮಾತ್ರ Recycle Binಗೆ move ಮಾಡಬಹುದು."
       );
+
       return;
     }
 
     const ok =
       confirm(
         `🗑️ ${a.name}\n\nMembership No: ${
-          a.membership_no || "—"
+          a.membership_no ||
+          "—"
         }\n\nಈ member ಅನ್ನು Recycle Binಗೆ move ಮಾಡಬೇಕೇ?\n\nಇದು permanent delete ಅಲ್ಲ. ನಂತರ Recover ಮಾಡಬಹುದು.`
       );
 
@@ -493,7 +587,8 @@ export default function Admin() {
 
     const {
       data: userData,
-    } = await supabase.auth.getUser();
+    } =
+      await supabase.auth.getUser();
 
     // Soft delete application
     const {
@@ -501,9 +596,12 @@ export default function Admin() {
     } = await supabase
       .from("applications")
       .update({
-        is_deleted: true,
+        is_deleted:
+          true,
+
         deleted_at:
           new Date().toISOString(),
+
         deleted_by:
           userData.user?.id ||
           null,
@@ -519,13 +617,15 @@ export default function Admin() {
       return;
     }
 
-    // Deactivate public page
+    // Deactivate Public Page
     const {
-      error: publicError,
+      error:
+        publicError,
     } = await supabase
       .from("member_info_page")
       .update({
-        is_active: false,
+        is_active:
+          false,
       })
       .eq("member_id", a.id);
 
@@ -555,7 +655,8 @@ export default function Admin() {
     const ok =
       confirm(
         `♻️ ${a.name}\n\nMembership No: ${
-          a.membership_no || "—"
+          a.membership_no ||
+          "—"
         }\n\nಈ member ಅನ್ನು ಮತ್ತೆ Approved Membersಗೆ ತರಬೇಕೇ?`
       );
 
@@ -569,10 +670,17 @@ export default function Admin() {
     } = await supabase
       .from("applications")
       .update({
-        is_deleted: false,
-        deleted_at: null,
-        deleted_by: null,
-        status: "approved",
+        is_deleted:
+          false,
+
+        deleted_at:
+          null,
+
+        deleted_by:
+          null,
+
+        status:
+          "approved",
       })
       .eq("id", a.id);
 
@@ -585,7 +693,7 @@ export default function Admin() {
       return;
     }
 
-    // Restore public page
+    // Restore Public Page
     const publicPage =
       await createPublicPage(
         a
@@ -615,7 +723,8 @@ export default function Admin() {
     const ok =
       confirm(
         `⚠️ PERMANENT DELETE\n\n${a.name}\nMembership No: ${
-          a.membership_no || "—"
+          a.membership_no ||
+          "—"
         }\n\nಈ member ಅನ್ನು databaseನಿಂದ ಸಂಪೂರ್ಣವಾಗಿ delete ಮಾಡಲಾಗುತ್ತದೆ.\n\nಇದನ್ನು Recover ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.\n\nಮುಂದುವರಿಸಬೇಕೇ?`
       );
 
@@ -623,9 +732,10 @@ export default function Admin() {
       return;
     }
 
-    // Delete public page first
+    // Delete Public Page first
     const {
-      error: publicPageError,
+      error:
+        publicPageError,
     } = await supabase
       .from("member_info_page")
       .delete()
@@ -642,7 +752,8 @@ export default function Admin() {
 
     // Delete application
     const {
-      error: applicationError,
+      error:
+        applicationError,
     } = await supabase
       .from("applications")
       .delete()
@@ -665,7 +776,7 @@ export default function Admin() {
   }
 
   // =====================================================
-  // EXCEL DOWNLOAD
+  // APPROVED MEMBERS EXCEL
   // =====================================================
 
   async function downloadApprovedExcel() {
@@ -679,16 +790,24 @@ export default function Admin() {
         .from("applications")
         .select("*")
         .eq("status", "approved")
-        .eq("is_deleted", false)
+        .eq(
+          "is_deleted",
+          false
+        )
         .order(
           "membership_no",
           {
-            ascending: true,
+            ascending:
+              true,
           }
         );
 
       if (error) {
-        alert(error.message);
+        alert(
+          "Excel data load ಆಗಲಿಲ್ಲ:\n\n" +
+            error.message
+        );
+
         return;
       }
 
@@ -717,33 +836,40 @@ export default function Admin() {
               "",
 
             "Name":
-              a.name || "",
+              a.name ||
+              "",
 
             "Designation":
               a.designation ||
               "",
 
             "Village":
-              a.village || "",
+              a.village ||
+              "",
 
             "Taluk":
-              a.taluk || "",
+              a.taluk ||
+              "",
 
             "District":
               a.district ||
               "",
 
             "Mobile":
-              a.mobile || "",
+              a.mobile ||
+              "",
 
             "Aadhaar":
-              a.aadhaar || "",
+              a.aadhaar ||
+              "",
 
             "Status":
-              a.status || "",
+              a.status ||
+              "",
 
             "Application ID":
-              a.id || "",
+              a.id ||
+              "",
 
             "Created At":
               a.created_at
@@ -761,19 +887,45 @@ export default function Admin() {
           rows
         );
 
-      worksheet["!cols"] = [
-        { wch: 8 },
-        { wch: 20 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 18 },
-        { wch: 18 },
-        { wch: 16 },
-        { wch: 18 },
-        { wch: 14 },
-        { wch: 40 },
-        { wch: 24 },
+      worksheet[
+        "!cols"
+      ] = [
+        {
+          wch: 8,
+        },
+        {
+          wch: 20,
+        },
+        {
+          wch: 25,
+        },
+        {
+          wch: 20,
+        },
+        {
+          wch: 20,
+        },
+        {
+          wch: 18,
+        },
+        {
+          wch: 18,
+        },
+        {
+          wch: 16,
+        },
+        {
+          wch: 18,
+        },
+        {
+          wch: 14,
+        },
+        {
+          wch: 40,
+        },
+        {
+          wch: 24,
+        },
       ];
 
       const workbook =
@@ -788,7 +940,10 @@ export default function Admin() {
       const date =
         new Date()
           .toISOString()
-          .slice(0, 10);
+          .slice(
+            0,
+            10
+          );
 
       XLSX.writeFile(
         workbook,
@@ -799,15 +954,21 @@ export default function Admin() {
         `${data.length} Approved Members Excel download ಆಯಿತು ✅`
       );
     } catch (error: any) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       alert(
         "Excel generate ಆಗಲಿಲ್ಲ:\n\n" +
-          (error?.message ||
-            "Unknown error")
+          (
+            error?.message ||
+            "Unknown error"
+          )
       );
     } finally {
-      setExporting(false);
+      setExporting(
+        false
+      );
     }
   }
 
@@ -824,31 +985,35 @@ export default function Admin() {
   }
 
   // =====================================================
-  // ACTIVE / DELETED
+  // ACTIVE / RECYCLE BIN
   // =====================================================
 
   const activeApps =
     apps.filter(
       (a: any) =>
-        a.is_deleted !== true
+        a.is_deleted !==
+        true
     );
 
   const recycleApps =
     apps.filter(
       (a: any) =>
-        a.is_deleted === true
+        a.is_deleted ===
+        true
     );
 
   // =====================================================
-  // SEARCH + FILTER
+  // FILTER + SEARCH
   // =====================================================
 
   const shown =
     activeApps.filter(
       (a: any) => {
         const matchesStatus =
-          status === "all" ||
-          a.status === status;
+          status ===
+            "all" ||
+          a.status ===
+            status;
 
         const searchText =
           Object.values(a)
@@ -872,7 +1037,8 @@ export default function Admin() {
   // =====================================================
 
   const counts = {
-    all: activeApps.length,
+    all:
+      activeApps.length,
 
     pending:
       activeApps.filter(
@@ -960,13 +1126,16 @@ export default function Admin() {
               className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg font-semibold"
             >
               ♻️ Recycle Bin
+
               {recycleApps.length >
                 0 &&
                 ` (${recycleApps.length})`}
             </button>
 
             <button
-              onClick={logout}
+              onClick={
+                logout
+              }
               className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg"
             >
               Logout
@@ -979,7 +1148,7 @@ export default function Admin() {
       </header>
 
       {/* ==========================================
-          CONTENT
+          MAIN
       ========================================== */}
 
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -1048,9 +1217,13 @@ export default function Admin() {
 
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
 
-            <b>Example:</b>{" "}
-            Starting Number ={" "}
+            <b>ಉದಾಹರಣೆ:</b>
+
+            <br />
+
+            Starting Number =
             <b>
+              {" "}
               {membershipStartNo ||
                 "1"}
             </b>
@@ -1058,29 +1231,32 @@ export default function Admin() {
             <br />
 
             ಹೊಸ members:
-            {" "}
-            {membershipStartNo ||
-              "1"}
-            {" → "}
-            {(
-              Number(
+
+            <b>
+              {" "}
+              {membershipStartNo ||
+                "1"}
+              {" → "}
+              {Number(
                 membershipStartNo ||
                   1
-              ) + 1
-            )}
-            {" → "}
-            {(
-              Number(
+              ) + 1}
+              {" → "}
+              {Number(
                 membershipStartNo ||
                   1
-              ) + 2
-            )}
-            ...
+              ) + 2}
+              {" → ..."}
+            </b>
 
             <br />
 
-            Existing Membership Numbers
-            <b> ಬದಲಾಗುವುದಿಲ್ಲ.</b>
+            ಈಗಾಗಲೇ ಇರುವ Membership
+            Numbers
+            <b>
+              {" "}
+              ಬದಲಾಗುವುದಿಲ್ಲ.
+            </b>
 
           </div>
 
@@ -1091,7 +1267,6 @@ export default function Admin() {
         ======================================== */}
 
         {showRecycleBin && (
-
           <section className="bg-orange-50 border border-orange-200 rounded-2xl p-5 mb-6">
 
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -1109,20 +1284,20 @@ export default function Admin() {
               </div>
 
               <div className="bg-orange-200 text-orange-900 px-4 py-2 rounded-xl font-bold">
-                {recycleApps.length} Deleted
+                {
+                  recycleApps.length
+                }{" "}
+                Deleted
               </div>
 
             </div>
 
             {recycleApps.length ===
             0 ? (
-
               <div className="bg-white rounded-xl p-6 mt-4 text-center text-slate-500">
                 Recycle Bin ಖಾಲಿಯಾಗಿದೆ.
               </div>
-
             ) : (
-
               <div className="overflow-x-auto mt-4">
 
                 <table className="w-full bg-white rounded-xl overflow-hidden">
@@ -1155,7 +1330,6 @@ export default function Admin() {
 
                     {recycleApps.map(
                       (a: any) => (
-
                         <tr
                           key={a.id}
                           className="border-t"
@@ -1211,7 +1385,6 @@ export default function Admin() {
                           </td>
 
                         </tr>
-
                       )
                     )}
 
@@ -1220,11 +1393,9 @@ export default function Admin() {
                 </table>
 
               </div>
-
             )}
 
           </section>
-
         )}
 
         {/* ========================================
@@ -1240,35 +1411,37 @@ export default function Admin() {
               "approved",
               "rejected",
             ] as const
-          ).map((s) => (
-
-            <button
-              key={s}
-              onClick={() =>
-                setStatus(s)
-              }
-              className={`
-                bg-white rounded-2xl p-5
-                text-left shadow-sm
-                ${
-                  status === s
-                    ? "ring-2 ring-green-500"
-                    : ""
+          ).map(
+            (s) => (
+              <button
+                key={s}
+                onClick={() =>
+                  setStatus(s)
                 }
-              `}
-            >
+                className={`
+                  bg-white rounded-2xl p-5
+                  text-left shadow-sm
+                  ${
+                    status === s
+                      ? "ring-2 ring-green-500"
+                      : ""
+                  }
+                `}
+              >
 
-              <div className="text-sm text-slate-500">
-                {s.toUpperCase()}
-              </div>
+                <div className="text-sm text-slate-500">
+                  {s.toUpperCase()}
+                </div>
 
-              <div className="text-3xl font-bold mt-1">
-                {counts[s]}
-              </div>
+                <div className="text-3xl font-bold mt-1">
+                  {
+                    counts[s]
+                  }
+                </div>
 
-            </button>
-
-          ))}
+              </button>
+            )
+          )}
 
         </div>
 
@@ -1332,20 +1505,15 @@ export default function Admin() {
           ====================================== */}
 
           {loading ? (
-
             <p className="p-6">
               Loading...
             </p>
-
           ) : shown.length ===
             0 ? (
-
             <div className="p-10 text-center text-slate-500">
               No applications found.
             </div>
-
           ) : (
-
             <div className="overflow-x-auto">
 
               <table className="w-full text-sm">
@@ -1386,7 +1554,6 @@ export default function Admin() {
 
                   {shown.map(
                     (a: any) => (
-
                       <tr
                         key={a.id}
                         className="border-t hover:bg-slate-50"
@@ -1421,7 +1588,9 @@ export default function Admin() {
                               }
                             `}
                           >
-                            {a.status}
+                            {
+                              a.status
+                            }
                           </span>
 
                         </td>
@@ -1444,7 +1613,6 @@ export default function Admin() {
 
                             {a.status ===
                               "pending" && (
-
                               <button
                                 onClick={() =>
                                   approve(
@@ -1455,12 +1623,10 @@ export default function Admin() {
                               >
                                 Approve
                               </button>
-
                             )}
 
                             {a.status ===
                               "pending" && (
-
                               <button
                                 onClick={() =>
                                   reject(
@@ -1471,24 +1637,20 @@ export default function Admin() {
                               >
                                 Reject
                               </button>
-
                             )}
 
                             {a.status ===
                               "approved" && (
-
                               <Link
                                 href={`/admin/card?id=${a.id}`}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg"
                               >
                                 Card
                               </Link>
-
                             )}
 
                             {a.status ===
                               "approved" && (
-
                               <Link
                                 href={`/public-page?id=${a.id}`}
                                 target="_blank"
@@ -1496,12 +1658,10 @@ export default function Admin() {
                               >
                                 Public Page
                               </Link>
-
                             )}
 
                             {a.status ===
                               "approved" && (
-
                               <button
                                 onClick={() =>
                                   moveToRecycleBin(
@@ -1512,7 +1672,6 @@ export default function Admin() {
                               >
                                 🗑️ Delete
                               </button>
-
                             )}
 
                           </div>
@@ -1520,7 +1679,6 @@ export default function Admin() {
                         </td>
 
                       </tr>
-
                     )
                   )}
 
@@ -1529,7 +1687,6 @@ export default function Admin() {
               </table>
 
             </div>
-
           )}
 
         </div>
