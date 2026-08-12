@@ -17,8 +17,8 @@
     "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-easy-crop": "^5.4.1"
-    "xlsx": "^0.18.5",
+    "react-easy-crop": "^5.4.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.5",
