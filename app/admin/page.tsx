@@ -5,15 +5,20 @@ import { supabase } from "@/lib/supabase";
 import type { Application } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 
 export default function Admin() {
   const [apps, setApps] = useState<Application[]>([]);
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const router = useRouter();
 
+  // =========================
+  // LOAD APPLICATIONS
+  // =========================
   async function load() {
     setLoading(true);
 
@@ -32,6 +37,9 @@ export default function Admin() {
     setLoading(false);
   }
 
+  // =========================
+  // AUTH CHECK
+  // =========================
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getUser();
@@ -47,6 +55,9 @@ export default function Admin() {
     checkUser();
   }, [router]);
 
+  // =========================
+  // UPDATE APPLICATION
+  // =========================
   async function update(
     id: string,
     patch: Partial<Application>
@@ -58,12 +69,16 @@ export default function Admin() {
 
     if (error) {
       alert(error.message);
-      return;
+      return false;
     }
 
     await load();
+    return true;
   }
 
+  // =========================
+  // CREATE PUBLIC PAGE
+  // =========================
   async function createPublicPage(a: Application) {
     const { data: existing, error: findError } =
       await supabase
@@ -74,9 +89,10 @@ export default function Admin() {
 
     if (findError) {
       alert(
-        "Public Page check error: " +
+        "Public Page check error:\n" +
           findError.message
       );
+
       return false;
     }
 
@@ -106,28 +122,88 @@ export default function Admin() {
         "Public Page create ಆಗಲಿಲ್ಲ:\n" +
           error.message
       );
+
       return false;
     }
 
     return true;
   }
 
+  // =========================
+  // GET NEXT MEMBERSHIP NUMBER
+  // =========================
+  async function getNextMembershipNumber() {
+    const { data, error } = await supabase
+      .from("applications")
+      .select("membership_no")
+      .not("membership_no", "is", null);
+
+    if (error) {
+      console.error(error);
+      return "1";
+    }
+
+    let maxNumber = 0;
+
+    (data || []).forEach((row: any) => {
+      const value = String(row.membership_no || "").trim();
+
+      // Only numeric membership numbers
+      const number = Number(value);
+
+      if (
+        value !== "" &&
+        Number.isFinite(number) &&
+        number > maxNumber
+      ) {
+        maxNumber = number;
+      }
+    });
+
+    return String(maxNumber + 1);
+  }
+
+  // =========================
+  // APPROVE MEMBER
+  // =========================
   async function approve(a: Application) {
+    const automaticNext =
+      await getNextMembershipNumber();
+
     const next = prompt(
-      "Membership Number ಹಾಕಿ.\n\nಖಾಲಿ ಬಿಟ್ಟರೆ automatic number ಬರುತ್ತದೆ.",
-      ""
+      `Membership Number ಹಾಕಿ.\n\nಮುಂದಿನ automatic number: ${automaticNext}\n\nಖಾಲಿ ಬಿಟ್ಟರೆ ${automaticNext} ಬಳಸಲಾಗುತ್ತದೆ.`,
+      automaticNext
     );
 
     if (next === null) {
       return;
     }
 
+    const membershipNumber =
+      next.trim() || automaticNext;
+
+    // Check duplicate membership number
+    const duplicate = apps.find(
+      (item) =>
+        item.id !== a.id &&
+        item.membership_no &&
+        String(item.membership_no).trim() ===
+          membershipNumber
+    );
+
+    if (duplicate) {
+      alert(
+        `Membership Number ${membershipNumber} ಈಗಾಗಲೇ ಬಳಕೆಯಲ್ಲಿದೆ.\n\nಹಳೆಯ Member: ${duplicate.name}`
+      );
+      return;
+    }
+
+    // Approve using existing RPC
     const { error } = await supabase.rpc(
       "approve_application",
       {
         p_id: a.id,
-        p_membership_no:
-          next.trim() || null,
+        p_membership_no: membershipNumber,
       }
     );
 
@@ -136,16 +212,12 @@ export default function Admin() {
       return;
     }
 
-    /*
-     * APPROVED MEMBER → AUTOMATIC PUBLIC PAGE
-     */
+    // Create Public Page automatically
     const publicPageCreated =
       await createPublicPage({
         ...a,
         status: "approved",
-        membership_no:
-          next.trim() ||
-          a.membership_no,
+        membership_no: membershipNumber,
       } as Application);
 
     if (!publicPageCreated) {
@@ -155,10 +227,13 @@ export default function Admin() {
     await load();
 
     alert(
-      "Member Approved ✅\n\nPublic Page ಕೂಡ automatic ಆಗಿ create ಆಗಿದೆ."
+      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nPublic Page ಕೂಡ automatic ಆಗಿ create ಆಗಿದೆ.`
     );
   }
 
+  // =========================
+  // REJECT
+  // =========================
   async function reject(a: Application) {
     const ok = confirm(
       `${a.name} ಅವರ application ಅನ್ನು Reject ಮಾಡಬೇಕೇ?`
@@ -171,11 +246,179 @@ export default function Admin() {
     });
   }
 
+  // =========================
+  // DELETE APPROVED MEMBER
+  // =========================
+  async function deleteApprovedMember(
+    a: Application
+  ) {
+    if (a.status !== "approved") {
+      alert(
+        "Approved members ಮಾತ್ರ delete ಮಾಡಬಹುದು."
+      );
+      return;
+    }
+
+    const ok = confirm(
+      `${a.name}\nMembership No: ${
+        a.membership_no || "—"
+      }\n\nಈ approved member ಅನ್ನು ಸಂಪೂರ್ಣವಾಗಿ delete ಮಾಡಬೇಕೇ?\n\nಈ action ಅನ್ನು undo ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.`
+    );
+
+    if (!ok) return;
+
+    // First delete public page
+    const { error: publicPageError } =
+      await supabase
+        .from("member_info_page")
+        .delete()
+        .eq("member_id", a.id);
+
+    if (publicPageError) {
+      alert(
+        "Public Page delete ಆಗಲಿಲ್ಲ:\n" +
+          publicPageError.message
+      );
+      return;
+    }
+
+    // Then delete application
+    const { error: applicationError } =
+      await supabase
+        .from("applications")
+        .delete()
+        .eq("id", a.id);
+
+    if (applicationError) {
+      alert(
+        "Member delete ಆಗಲಿಲ್ಲ:\n" +
+          applicationError.message
+      );
+      return;
+    }
+
+    await load();
+
+    alert(
+      "Approved Member successfully deleted ✅"
+    );
+  }
+
+  // =========================
+  // EXPORT APPROVED MEMBERS TO EXCEL
+  // =========================
+  async function downloadApprovedExcel() {
+    try {
+      setExporting(true);
+
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("status", "approved")
+        .order("membership_no", {
+          ascending: true,
+        });
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        alert(
+          "Approved Members ಯಾರೂ ಇಲ್ಲ."
+        );
+        return;
+      }
+
+      const rows = data.map(
+        (a: any, index: number) => ({
+          "Sl No": index + 1,
+          "Membership Number":
+            a.membership_no || "",
+          "Name": a.name || "",
+          "Designation": a.designation || "",
+          "Village": a.village || "",
+          "Taluk": a.taluk || "",
+          "District": a.district || "",
+          "Mobile": a.mobile || "",
+          "Aadhaar": a.aadhaar || "",
+          "Status": a.status || "",
+          "Photo URL": a.photo_url || "",
+          "Application ID": a.id || "",
+          "Created At": a.created_at
+            ? new Date(
+                a.created_at
+              ).toLocaleString("en-IN")
+            : "",
+        })
+      );
+
+      const worksheet =
+        XLSX.utils.json_to_sheet(rows);
+
+      // Column widths
+      worksheet["!cols"] = [
+        { wch: 8 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 16 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 45 },
+        { wch: 40 },
+        { wch: 24 },
+      ];
+
+      const workbook =
+        XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Approved Members"
+      );
+
+      const date =
+        new Date()
+          .toISOString()
+          .slice(0, 10);
+
+      XLSX.writeFile(
+        workbook,
+        `Approved-Members-${date}.xlsx`
+      );
+
+      alert(
+        `${data.length} Approved Members Excel download ಆಯಿತು ✅`
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        "Excel generate ಆಗಲಿಲ್ಲ:\n" +
+          (error?.message || "Unknown error")
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // =========================
+  // LOGOUT
+  // =========================
   async function logout() {
     await supabase.auth.signOut();
     router.push("/admin/login");
   }
 
+  // =========================
+  // FILTER
+  // =========================
   const shown = apps.filter((a) => {
     const matchesStatus =
       status === "all" ||
@@ -196,6 +439,9 @@ export default function Admin() {
     );
   });
 
+  // =========================
+  // COUNTS
+  // =========================
   const counts = {
     all: apps.length,
 
@@ -212,12 +458,14 @@ export default function Admin() {
     ).length,
   };
 
+  // =========================
+  // UI
+  // =========================
   return (
     <main className="min-h-screen bg-slate-100">
 
       {/* HEADER */}
       <header className="bg-slate-950 text-white">
-
         <div className="max-w-7xl mx-auto px-4 py-5 flex flex-wrap gap-4 justify-between items-center">
 
           <div>
@@ -247,6 +495,18 @@ export default function Admin() {
             </Link>
 
             <button
+              onClick={
+                downloadApprovedExcel
+              }
+              disabled={exporting}
+              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg font-semibold"
+            >
+              {exporting
+                ? "Preparing Excel..."
+                : "📊 Approved Excel"}
+            </button>
+
+            <button
               onClick={logout}
               className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg"
             >
@@ -254,9 +514,7 @@ export default function Admin() {
             </button>
 
           </div>
-
         </div>
-
       </header>
 
       {/* CONTENT */}
@@ -304,6 +562,33 @@ export default function Admin() {
 
         </div>
 
+        {/* APPROVED EXPORT AREA */}
+        <div className="bg-white rounded-2xl mt-6 p-5 shadow-sm flex flex-wrap gap-3 items-center justify-between">
+
+          <div>
+            <h2 className="font-bold text-lg">
+              Approved Members
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              Approved members details ಅನ್ನು Excel sheet ಆಗಿ download ಮಾಡಬಹುದು.
+            </p>
+          </div>
+
+          <button
+            onClick={
+              downloadApprovedExcel
+            }
+            disabled={exporting}
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold"
+          >
+            {exporting
+              ? "Generating..."
+              : "📥 Download Approved Excel"}
+          </button>
+
+        </div>
+
         {/* TABLE */}
         <div className="bg-white rounded-2xl mt-6 shadow-sm overflow-hidden">
 
@@ -311,7 +596,7 @@ export default function Admin() {
           <div className="p-4">
 
             <input
-              placeholder="ಹೆಸರು / Mobile / District ಹುಡುಕಿ..."
+              placeholder="ಹೆಸರು / Mobile / District / Membership Number ಹುಡುಕಿ..."
               value={q}
               onChange={(e) =>
                 setQ(e.target.value)
@@ -348,7 +633,7 @@ export default function Admin() {
                       "ಮೊಬೈಲ್",
                       "ಜಿಲ್ಲೆ",
                       "Status",
-                      "Member ID",
+                      "Membership No",
                       "Action",
                     ].map((x) => (
 
@@ -408,7 +693,7 @@ export default function Admin() {
 
                       </td>
 
-                      <td className="p-3">
+                      <td className="p-3 font-bold">
                         {a.membership_no ||
                           "—"}
                       </td>
@@ -417,6 +702,7 @@ export default function Admin() {
 
                         <div className="flex flex-wrap gap-2">
 
+                          {/* EDIT */}
                           <Link
                             href={`/admin/application?id=${a.id}`}
                             className="border border-slate-300 px-3 py-2 rounded-lg hover:bg-slate-100"
@@ -424,6 +710,7 @@ export default function Admin() {
                             Edit
                           </Link>
 
+                          {/* APPROVE */}
                           {a.status ===
                             "pending" && (
                             <button
@@ -436,6 +723,7 @@ export default function Admin() {
                             </button>
                           )}
 
+                          {/* REJECT */}
                           {a.status ===
                             "pending" && (
                             <button
@@ -448,6 +736,7 @@ export default function Admin() {
                             </button>
                           )}
 
+                          {/* CARD */}
                           {a.status ===
                             "approved" && (
                             <Link
@@ -458,6 +747,7 @@ export default function Admin() {
                             </Link>
                           )}
 
+                          {/* PUBLIC PAGE */}
                           {a.status ===
                             "approved" && (
                             <Link
@@ -467,6 +757,21 @@ export default function Admin() {
                             >
                               Public Page
                             </Link>
+                          )}
+
+                          {/* DELETE */}
+                          {a.status ===
+                            "approved" && (
+                            <button
+                              onClick={() =>
+                                deleteApprovedMember(
+                                  a
+                                )
+                              }
+                              className="bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-lg"
+                            >
+                              🗑 Delete
+                            </button>
                           )}
 
                         </div>
@@ -488,7 +793,6 @@ export default function Admin() {
         </div>
 
       </div>
-
     </main>
   );
 }
