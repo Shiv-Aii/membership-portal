@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
+
 import { useSearchParams } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
@@ -32,10 +37,15 @@ type Member = {
   description?: string;
 };
 
+/* =====================================================
+   VERIFY PAGE CONTENT
+===================================================== */
+
 function VerifyPageContent() {
   const searchParams = useSearchParams();
 
   const [number, setNumber] = useState("");
+
   const [member, setMember] =
     useState<Member | null>(null);
 
@@ -48,11 +58,12 @@ function VerifyPageContent() {
   const [verifiedAt, setVerifiedAt] =
     useState<Date | null>(null);
 
-  /*
-   * =====================================================
-   * QR / URL NUMBER
-   * =====================================================
-   */
+  /* ===================================================
+     GET MEMBERSHIP NUMBER FROM QR URL
+     
+     Example:
+     /verify?membership=11
+  =================================================== */
 
   useEffect(() => {
     const qrNumber =
@@ -66,11 +77,9 @@ function VerifyPageContent() {
     }
   }, [searchParams]);
 
-  /*
-   * =====================================================
-   * VERIFY MEMBER
-   * =====================================================
-   */
+  /* ===================================================
+     VERIFY MEMBER
+  =================================================== */
 
   async function verifyMember() {
     const cleanNumber =
@@ -92,9 +101,8 @@ function VerifyPageContent() {
 
     try {
       /*
-       * RPC CALL
+       * Supabase RPC
        *
-       * Supabase SQL function:
        * verify_member(text)
        */
 
@@ -134,15 +142,10 @@ function VerifyPageContent() {
       }
 
       /*
-       * RPC JSON result
+       * RPC result array ಆಗಿರಬಹುದು
        */
 
       let result: any = data;
-
-      /*
-       * ಕೆಲವೊಮ್ಮೆ RPC table result
-       * array ಆಗಿ ಬರುತ್ತದೆ.
-       */
 
       if (Array.isArray(result)) {
         result =
@@ -187,16 +190,15 @@ function VerifyPageContent() {
             "Unknown error"
           )
       );
+
     } finally {
       setLoading(false);
     }
   }
 
-  /*
-   * =====================================================
-   * ENTER KEY
-   * =====================================================
-   */
+  /* ===================================================
+     ENTER KEY
+  =================================================== */
 
   function handleKeyDown(
     e: React.KeyboardEvent<HTMLInputElement>
@@ -206,11 +208,9 @@ function VerifyPageContent() {
     }
   }
 
-  /*
-   * =====================================================
-   * VERIFIED DATE
-   * =====================================================
-   */
+  /* ===================================================
+     VERIFIED DATE
+  =================================================== */
 
   const verifiedDateTime =
     verifiedAt
@@ -223,11 +223,9 @@ function VerifyPageContent() {
         )
       : "";
 
-  /*
-   * =====================================================
-   * MEMBER VALUES
-   * =====================================================
-   */
+  /* ===================================================
+     MEMBER VALUES
+  =================================================== */
 
   const memberName =
     member?.name ||
@@ -274,11 +272,9 @@ function VerifyPageContent() {
       .filter(Boolean)
       .join(", ");
 
-  /*
-   * =====================================================
-   * PAGE
-   * =====================================================
-   */
+  /* ===================================================
+     PAGE
+  =================================================== */
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -289,11 +285,20 @@ function VerifyPageContent() {
 
       <header className="bg-slate-950 text-white px-5 py-10 text-center">
 
-        <h1 className="text-4xl md:text-5xl font-extrabold">
+        <h1 className="
+          text-4xl
+          md:text-5xl
+          font-extrabold
+        ">
           Member Verification
         </h1>
 
-        <p className="text-slate-400 text-lg md:text-2xl mt-4">
+        <p className="
+          text-slate-400
+          text-lg
+          md:text-xl
+          mt-4
+        ">
           Membership Number ಮೂಲಕ ಸದಸ್ಯರನ್ನು ಪರಿಶೀಲಿಸಿ
         </p>
 
@@ -301,68 +306,81 @@ function VerifyPageContent() {
 
 
       {/* =================================================
-          MAIN
+          MAIN CONTAINER
       ================================================= */}
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="
+        max-w-3xl
+        mx-auto
+        px-4
+        py-8
+      ">
 
 
         {/* =================================================
             VERIFY BOX
         ================================================= */}
 
-        <section className="bg-white rounded-3xl shadow-md p-6 md:p-10">
+        <section className="
+          bg-white
+          rounded-3xl
+          shadow-md
+          p-6
+          md:p-10
+        ">
 
           <div className="text-center">
 
-            <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">
-
+            <h2 className="
+              text-3xl
+              md:text-4xl
+              font-extrabold
+              text-slate-900
+            ">
               🔎 Verify Membership
-
             </h2>
 
-            <p className="text-slate-500 text-lg md:text-xl mt-4">
-
+            <p className="
+              text-slate-500
+              text-lg
+              mt-4
+            ">
               Membership Number ಮೂಲಕ ಅಥವಾ PVC Card QR scan ಮಾಡಿ
-
             </p>
 
           </div>
 
 
-          {/* INPUT */}
+          {/* MEMBERSHIP INPUT */}
 
-          <div className="mt-8">
-
-            <input
-              type="text"
-              inputMode="numeric"
-              value={number}
-              onChange={(e) =>
-                setNumber(
-                  e.target.value
-                )
-              }
-              onKeyDown={
-                handleKeyDown
-              }
-              placeholder="Membership Number ಹಾಕಿ"
-              className="
-                w-full
-                border-2
-                border-slate-300
-                focus:border-blue-600
-                outline-none
-                rounded-2xl
-                px-6
-                py-5
-                text-3xl
-                font-semibold
-                text-slate-900
-              "
-            />
-
-          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={number}
+            onChange={(e) =>
+              setNumber(
+                e.target.value
+              )
+            }
+            onKeyDown={
+              handleKeyDown
+            }
+            placeholder="Membership Number ಹಾಕಿ"
+            className="
+              w-full
+              mt-8
+              border-2
+              border-slate-300
+              focus:border-blue-600
+              outline-none
+              rounded-2xl
+              px-6
+              py-5
+              text-2xl
+              font-semibold
+              text-slate-900
+            "
+          />
 
 
           {/* VERIFY BUTTON */}
@@ -383,9 +401,8 @@ function VerifyPageContent() {
               rounded-2xl
               px-6
               py-5
-              text-2xl
+              text-xl
               font-bold
-              transition
             "
           >
 
@@ -399,14 +416,16 @@ function VerifyPageContent() {
           {/* QR NUMBER */}
 
           {number && (
-            <div className="text-center mt-6">
+            <div className="
+              text-center
+              mt-6
+              text-blue-600
+              text-lg
+              font-semibold
+            ">
 
-              <p className="text-blue-600 text-xl font-semibold">
-
-                QR Verification Number:{" "}
-                {number}
-
-              </p>
+              QR Verification Number:{" "}
+              {number}
 
             </div>
           )}
@@ -420,17 +439,31 @@ function VerifyPageContent() {
 
         {loading && (
 
-          <section className="bg-white rounded-3xl shadow-md p-10 mt-6 text-center">
+          <section className="
+            bg-white
+            rounded-3xl
+            shadow-md
+            p-10
+            mt-6
+            text-center
+          ">
 
-            <div className="text-5xl">
+            <div className="text-6xl">
               ⏳
             </div>
 
-            <h3 className="text-2xl font-bold mt-4">
+            <h3 className="
+              text-2xl
+              font-bold
+              mt-4
+            ">
               Verifying Member...
             </h3>
 
-            <p className="text-slate-500 mt-2">
+            <p className="
+              text-slate-500
+              mt-2
+            ">
               Databaseನಲ್ಲಿ Membership Number ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ.
             </p>
 
@@ -456,7 +489,8 @@ function VerifyPageContent() {
             mt-6
           ">
 
-            {/* VERIFIED HEADER */}
+
+            {/* OFFICIAL VERIFICATION */}
 
             <div className="text-center">
 
@@ -477,15 +511,22 @@ function VerifyPageContent() {
 
               </div>
 
-              {/* PHOTO */}
+
+              {/* MEMBER PHOTO */}
 
               {imageUrl && (
 
-                <div className="mt-6 flex justify-center">
+                <div className="
+                  mt-6
+                  flex
+                  justify-center
+                ">
 
                   <img
                     src={imageUrl}
-                    alt="Member"
+                    alt={
+                      memberName
+                    }
                     className="
                       w-32
                       h-32
@@ -493,7 +534,7 @@ function VerifyPageContent() {
                       object-cover
                       border-4
                       border-green-500
-                      shadow
+                      shadow-md
                     "
                   />
 
@@ -501,6 +542,8 @@ function VerifyPageContent() {
 
               )}
 
+
+              {/* NAME */}
 
               <h2 className="
                 text-3xl
@@ -517,44 +560,66 @@ function VerifyPageContent() {
             </div>
 
 
-            {/* MEMBER DETAILS */}
+            {/* =================================================
+                MEMBER DETAILS
+            ================================================= */}
 
             <div className="
               mt-8
               grid
-              gap-3
+              gap-4
             ">
+
+
+              {/* MEMBERSHIP NUMBER */}
 
               <div className="
                 bg-slate-50
                 rounded-xl
-                p-4
+                p-5
               ">
 
-                <div className="text-sm text-slate-500">
+                <div className="
+                  text-sm
+                  text-slate-500
+                ">
                   Membership Number
                 </div>
 
-                <div className="text-2xl font-bold text-slate-900">
+                <div className="
+                  text-2xl
+                  font-bold
+                  text-slate-900
+                  mt-1
+                ">
                   {membershipNumber}
                 </div>
 
               </div>
 
 
+              {/* DESIGNATION */}
+
               {designation && (
 
                 <div className="
                   bg-slate-50
                   rounded-xl
-                  p-4
+                  p-5
                 ">
 
-                  <div className="text-sm text-slate-500">
+                  <div className="
+                    text-sm
+                    text-slate-500
+                  ">
                     Designation
                   </div>
 
-                  <div className="text-xl font-semibold">
+                  <div className="
+                    text-xl
+                    font-semibold
+                    mt-1
+                  ">
                     {designation}
                   </div>
 
@@ -563,19 +628,28 @@ function VerifyPageContent() {
               )}
 
 
+              {/* ADDRESS */}
+
               {address && (
 
                 <div className="
                   bg-slate-50
                   rounded-xl
-                  p-4
+                  p-5
                 ">
 
-                  <div className="text-sm text-slate-500">
+                  <div className="
+                    text-sm
+                    text-slate-500
+                  ">
                     Address
                   </div>
 
-                  <div className="text-lg font-semibold">
+                  <div className="
+                    text-lg
+                    font-semibold
+                    mt-1
+                  ">
                     {address}
                   </div>
 
@@ -584,19 +658,28 @@ function VerifyPageContent() {
               )}
 
 
+              {/* MOBILE */}
+
               {mobile && (
 
                 <div className="
                   bg-slate-50
                   rounded-xl
-                  p-4
+                  p-5
                 ">
 
-                  <div className="text-sm text-slate-500">
+                  <div className="
+                    text-sm
+                    text-slate-500
+                  ">
                     Mobile
                   </div>
 
-                  <div className="text-lg font-semibold">
+                  <div className="
+                    text-lg
+                    font-semibold
+                    mt-1
+                  ">
                     {mobile}
                   </div>
 
@@ -607,10 +690,12 @@ function VerifyPageContent() {
             </div>
 
 
-            {/* ACTIVE STATUS */}
+            {/* =================================================
+                ACTIVE STATUS
+            ================================================= */}
 
             <div className="
-              mt-6
+              mt-7
               border-2
               border-green-200
               bg-green-50
@@ -639,6 +724,8 @@ function VerifyPageContent() {
 
               </div>
 
+
+              {/* VERIFIED DATE */}
 
               {verifiedDateTime && (
 
@@ -676,13 +763,12 @@ function VerifyPageContent() {
             bg-white
             rounded-3xl
             shadow-md
-            p-8
-            md:p-12
+            p-10
             mt-6
             text-center
           ">
 
-            <div className="text-8xl">
+            <div className="text-7xl">
               ❌
             </div>
 
@@ -693,32 +779,27 @@ function VerifyPageContent() {
               text-slate-900
               mt-6
             ">
-
               Member Not Found
-
             </h2>
 
             <p className="
               text-slate-500
               text-lg
-              md:text-xl
               mt-4
             ">
-
               ಈ Membership Numberಗೆ
               approved active member
               ಸಿಗಲಿಲ್ಲ.
-
             </p>
 
             <p className="
               text-slate-400
               mt-3
             ">
-
               Membership Number:{" "}
-              <b>{number}</b>
-
+              <b>
+                {number}
+              </b>
             </p>
 
           </section>
@@ -730,7 +811,11 @@ function VerifyPageContent() {
             BACK HOME
         ================================================= */}
 
-        <div className="text-center mt-8 mb-6">
+        <div className="
+          text-center
+          mt-8
+          mb-6
+        ">
 
           <a
             href="/"
@@ -760,14 +845,72 @@ function VerifyPageContent() {
 }
 
 
-/*
- * =========================================================
- * PAGE WRAPPER
- * =========================================================
- */
+/* =========================================================
+   PAGE WRAPPER
+
+   IMPORTANT:
+   useSearchParams() ಇರುವ component ಅನ್ನು
+   Suspense ಒಳಗೆ ಇಟ್ಟಿದ್ದೇವೆ.
+
+   ಇದರಿಂದ Vercel build error:
+   "useSearchParams() should be wrapped in
+   a suspense boundary"
+
+   fix ಆಗುತ್ತದೆ.
+========================================================= */
 
 export default function VerifyPage() {
+
   return (
-    <VerifyPageContent />
+
+    <Suspense
+      fallback={
+
+        <main className="
+          min-h-screen
+          bg-slate-100
+          flex
+          items-center
+          justify-center
+        ">
+
+          <div className="
+            bg-white
+            rounded-2xl
+            shadow-md
+            p-8
+            text-center
+          ">
+
+            <div className="text-5xl">
+              ⏳
+            </div>
+
+            <h1 className="
+              text-xl
+              font-bold
+              mt-4
+            ">
+              Loading Verification...
+            </h1>
+
+            <p className="
+              text-slate-500
+              mt-2
+            ">
+              Please wait...
+            </p>
+
+          </div>
+
+        </main>
+
+      }
+    >
+
+      <VerifyPageContent />
+
+    </Suspense>
+
   );
 }
