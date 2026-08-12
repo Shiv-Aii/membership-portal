@@ -8,17 +8,27 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 
 export default function Admin() {
+  const router = useRouter();
+
   const [apps, setApps] = useState<Application[]>([]);
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [showRecycleBin, setShowRecycleBin] = useState(false);
 
-  const router = useRouter();
+  const [showRecycleBin, setShowRecycleBin] =
+    useState(false);
+
+  // Membership number setting
+  const [membershipStartNo, setMembershipStartNo] =
+    useState("1");
+
+  const [savingMembershipStart, setSavingMembershipStart] =
+    useState(false);
 
   // =====================================================
-  // LOAD APPLICATIONS
+  // LOAD ALL APPLICATIONS
   // =====================================================
 
   async function load() {
@@ -32,6 +42,7 @@ export default function Admin() {
       });
 
     if (error) {
+      console.error(error);
       alert(error.message);
       setApps([]);
     } else {
@@ -42,11 +53,41 @@ export default function Admin() {
   }
 
   // =====================================================
+  // LOAD MEMBERSHIP START NUMBER
+  // =====================================================
+
+  async function loadMembershipStartNumber() {
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("membership_start_no")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Membership setting load error:",
+        error
+      );
+      return;
+    }
+
+    if (
+      data &&
+      data.membership_start_no !== null &&
+      data.membership_start_no !== undefined
+    ) {
+      setMembershipStartNo(
+        String(data.membership_start_no)
+      );
+    }
+  }
+
+  // =====================================================
   // AUTH
   // =====================================================
 
   useEffect(() => {
-    async function checkUser() {
+    async function init() {
       const { data } =
         await supabase.auth.getUser();
 
@@ -55,14 +96,65 @@ export default function Admin() {
         return;
       }
 
-      await load();
+      await Promise.all([
+        load(),
+        loadMembershipStartNumber(),
+      ]);
     }
 
-    checkUser();
+    init();
   }, [router]);
 
   // =====================================================
-  // UPDATE
+  // SAVE MEMBERSHIP START NUMBER
+  // =====================================================
+
+  async function saveMembershipStartNumber() {
+    const value =
+      membershipStartNo.trim();
+
+    const number = Number(value);
+
+    if (
+      !value ||
+      !Number.isInteger(number) ||
+      number < 1
+    ) {
+      alert(
+        "ದಯವಿಟ್ಟು 1 ಅಥವಾ ಅದಕ್ಕಿಂತ ದೊಡ್ಡ ಪೂರ್ಣ ಸಂಖ್ಯೆ ಹಾಕಿ."
+      );
+      return;
+    }
+
+    setSavingMembershipStart(true);
+
+    try {
+      const { error } =
+        await supabase
+          .from("site_settings")
+          .update({
+            membership_start_no: number,
+          })
+          .eq("id", 1);
+
+      if (error) {
+        alert(
+          "Starting Membership Number save ಆಗಲಿಲ್ಲ:\n\n" +
+            error.message
+        );
+        return;
+      }
+
+      alert(
+        `Membership Number starting number ${number} ಆಗಿ save ಆಯಿತು ✅`
+      );
+    } finally {
+      setSavingMembershipStart(false);
+    }
+  }
+
+  // =====================================================
+  // UPDATE APPLICATION
   // =====================================================
 
   async function update(
@@ -80,15 +172,16 @@ export default function Admin() {
     }
 
     await load();
+
     return true;
   }
 
   // =====================================================
-  // CREATE PUBLIC PAGE
+  // CREATE / RESTORE PUBLIC PAGE
   // =====================================================
 
   async function createPublicPage(
-    a: Application
+    a: any
   ) {
     const {
       data: existing,
@@ -101,49 +194,72 @@ export default function Admin() {
 
     if (findError) {
       alert(
-        "Public Page check error:\n" +
+        "Public Page check error:\n\n" +
           findError.message
       );
+
       return false;
     }
 
+    // Existing page → simply activate
     if (existing) {
-      await supabase
+      const {
+        error: updateError,
+      } = await supabase
         .from("member_info_page")
         .update({
           is_active: true,
         })
         .eq("member_id", a.id);
 
+      if (updateError) {
+        alert(
+          "Public Page active ಮಾಡಲಾಗಲಿಲ್ಲ:\n\n" +
+            updateError.message
+        );
+
+        return false;
+      }
+
       return true;
     }
 
-    const { error } = await supabase
-      .from("member_info_page")
-      .insert({
-        member_id: a.id,
-        title: "ಸದಸ್ಯರ ಮಾಹಿತಿ",
-        description: "",
-        image_url: a.photo_url || "",
-        phone: a.mobile || "",
-        address:
-          `${a.village || ""}, ${
-            a.taluk || ""
-          }, ${
-            a.district || ""
-          }`.replace(
-            /^,\s*|,\s*$/g,
-            ""
-          ),
-        website: "",
-        is_active: true,
-      });
+    // Create new page
+    const address =
+      `${a.village || ""}, ${
+        a.taluk || ""
+      }, ${a.district || ""}`
+        .replace(
+          /^,\s*/,
+          ""
+        )
+        .replace(
+          /,\s*$/,
+          ""
+        );
+
+    const { error } =
+      await supabase
+        .from("member_info_page")
+        .insert({
+          member_id: a.id,
+          title: "ಸದಸ್ಯರ ಮಾಹಿತಿ",
+          description: "",
+          image_url:
+            a.photo_url || "",
+          phone:
+            a.mobile || "",
+          address,
+          website: "",
+          is_active: true,
+        });
 
     if (error) {
       alert(
-        "Public Page create ಆಗಲಿಲ್ಲ:\n" +
+        "Public Page create ಆಗಲಿಲ್ಲ:\n\n" +
           error.message
       );
+
       return false;
     }
 
@@ -151,73 +267,109 @@ export default function Admin() {
   }
 
   // =====================================================
-  // NEXT MEMBERSHIP NUMBER
+  // GET NEXT MEMBERSHIP NUMBER
   // =====================================================
 
   async function getNextMembershipNumber() {
+    const startNumber =
+      Number(
+        membershipStartNo
+      ) || 1;
+
     const { data, error } =
       await supabase
         .from("applications")
-        .select("membership_no");
+        .select(
+          "membership_no"
+        );
 
     if (error) {
-      console.error(error);
-      return "1";
+      console.error(
+        "Membership number error:",
+        error
+      );
+
+      return String(
+        startNumber
+      );
     }
 
-    let maxNumber = 0;
+    let highest = startNumber - 1;
 
     (data || []).forEach(
       (row: any) => {
-        const value = String(
-          row.membership_no || ""
-        ).trim();
+        const value =
+          String(
+            row.membership_no ||
+              ""
+          ).trim();
 
-        const number = Number(value);
+        if (!value) {
+          return;
+        }
+
+        const number =
+          Number(value);
 
         if (
-          value !== "" &&
-          Number.isFinite(number) &&
-          number > maxNumber
+          Number.isInteger(
+            number
+          ) &&
+          number > highest
         ) {
-          maxNumber = number;
+          highest = number;
         }
       }
     );
 
     return String(
-      maxNumber + 1
+      Math.max(
+        startNumber,
+        highest + 1
+      )
     );
   }
 
   // =====================================================
-  // APPROVE
+  // APPROVE MEMBER
   // =====================================================
 
   async function approve(
-    a: Application
+    a: any
   ) {
     const automaticNext =
       await getNextMembershipNumber();
 
-    const next = prompt(
-      `Membership Number ಹಾಕಿ.\n\nಮುಂದಿನ automatic number: ${automaticNext}\n\nಖಾಲಿ ಬಿಟ್ಟರೆ ${automaticNext} ಬಳಸಲಾಗುತ್ತದೆ.`,
-      automaticNext
-    );
+    const input =
+      prompt(
+        `Membership Number ಹಾಕಿ.\n\nAutomatic next number: ${automaticNext}\n\nಖಾಲಿ ಬಿಟ್ಟರೆ ${automaticNext} ಬಳಸಲಾಗುತ್ತದೆ.`,
+        automaticNext
+      );
 
-    if (next === null) {
+    if (input === null) {
       return;
     }
 
     const membershipNumber =
-      next.trim() ||
+      input.trim() ||
       automaticNext;
 
+    if (
+      !/^\d+$/.test(
+        membershipNumber
+      )
+    ) {
+      alert(
+        "Membership Number numeric ಆಗಿರಬೇಕು."
+      );
+      return;
+    }
+
+    // Check duplicate
     const duplicate =
       apps.find(
         (item: any) =>
           item.id !== a.id &&
-          !item.is_deleted &&
           item.membership_no &&
           String(
             item.membership_no
@@ -229,9 +381,11 @@ export default function Admin() {
       alert(
         `Membership Number ${membershipNumber} ಈಗಾಗಲೇ ಬಳಕೆಯಲ್ಲಿದೆ.\n\nMember: ${duplicate.name}`
       );
+
       return;
     }
 
+    // Approve application
     const { error } =
       await supabase.rpc(
         "approve_application",
@@ -243,24 +397,30 @@ export default function Admin() {
       );
 
     if (error) {
-      alert(error.message);
+      alert(
+        "Approve ಆಗಲಿಲ್ಲ:\n\n" +
+          error.message
+      );
       return;
     }
 
+    // Create public page
     const publicPageCreated =
       await createPublicPage({
         ...a,
         status: "approved",
         membership_no:
           membershipNumber,
-      } as Application);
+      });
 
     if (!publicPageCreated) {
       return;
     }
 
-    // Make sure recovered/deleted flag is cleared
-    await supabase
+    // Make sure member is active
+    const {
+      error: clearDeleteError,
+    } = await supabase
       .from("applications")
       .update({
         is_deleted: false,
@@ -269,10 +429,17 @@ export default function Admin() {
       })
       .eq("id", a.id);
 
+    if (clearDeleteError) {
+      alert(
+        clearDeleteError.message
+      );
+      return;
+    }
+
     await load();
 
     alert(
-      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nPublic Page ಕೂಡ create ಆಗಿದೆ.`
+      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nPublic Page ready.`
     );
   }
 
@@ -281,13 +448,16 @@ export default function Admin() {
   // =====================================================
 
   async function reject(
-    a: Application
+    a: any
   ) {
-    const ok = confirm(
-      `${a.name} ಅವರ application ಅನ್ನು Reject ಮಾಡಬೇಕೇ?`
-    );
+    const ok =
+      confirm(
+        `${a.name} ಅವರ application ಅನ್ನು Reject ಮಾಡಬೇಕೇ?`
+      );
 
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     await update(a.id, {
       status: "rejected",
@@ -299,48 +469,57 @@ export default function Admin() {
   // =====================================================
 
   async function moveToRecycleBin(
-    a: Application
+    a: any
   ) {
-    if (a.status !== "approved") {
+    if (
+      a.status !== "approved"
+    ) {
       alert(
         "Approved member ಮಾತ್ರ Recycle Binಗೆ move ಮಾಡಬಹುದು."
       );
       return;
     }
 
-    const ok = confirm(
-      `🗑️ ${a.name}\n\nMembership No: ${
-        a.membership_no || "—"
-      }\n\nಈ member ಅನ್ನು Recycle Binಗೆ move ಮಾಡಬೇಕೇ?\n\nಇದು permanent delete ಅಲ್ಲ. ನಂತರ Recover ಮಾಡಬಹುದು.`
-    );
+    const ok =
+      confirm(
+        `🗑️ ${a.name}\n\nMembership No: ${
+          a.membership_no || "—"
+        }\n\nಈ member ಅನ್ನು Recycle Binಗೆ move ಮಾಡಬೇಕೇ?\n\nಇದು permanent delete ಅಲ್ಲ. ನಂತರ Recover ಮಾಡಬಹುದು.`
+      );
 
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     const {
       data: userData,
     } = await supabase.auth.getUser();
 
-    const { error } =
-      await supabase
-        .from("applications")
-        .update({
-          is_deleted: true,
-          deleted_at:
-            new Date().toISOString(),
-          deleted_by:
-            userData.user?.id || null,
-        })
-        .eq("id", a.id);
+    // Soft delete application
+    const {
+      error,
+    } = await supabase
+      .from("applications")
+      .update({
+        is_deleted: true,
+        deleted_at:
+          new Date().toISOString(),
+        deleted_by:
+          userData.user?.id ||
+          null,
+      })
+      .eq("id", a.id);
 
     if (error) {
       alert(
-        "Recycle Binಗೆ move ಆಗಲಿಲ್ಲ:\n" +
+        "Recycle Binಗೆ move ಆಗಲಿಲ್ಲ:\n\n" +
           error.message
       );
+
       return;
     }
 
-    // Public page inactive
+    // Deactivate public page
     const {
       error: publicError,
     } = await supabase
@@ -352,9 +531,10 @@ export default function Admin() {
 
     if (publicError) {
       alert(
-        "Public Page inactive ಮಾಡಲಾಗಲಿಲ್ಲ:\n" +
+        "Public Page inactive ಮಾಡಲಾಗಲಿಲ್ಲ:\n\n" +
           publicError.message
       );
+
       return;
     }
 
@@ -366,19 +546,22 @@ export default function Admin() {
   }
 
   // =====================================================
-  // RECOVER MEMBER
+  // RECOVER
   // =====================================================
 
   async function recoverMember(
-    a: Application
+    a: any
   ) {
-    const ok = confirm(
-      `♻️ ${a.name}\n\nMembership No: ${
-        a.membership_no || "—"
-      }\n\nಈ member ಅನ್ನು ಮತ್ತೆ Approved Membersಗೆ ತರಬೇಕೇ?`
-    );
+    const ok =
+      confirm(
+        `♻️ ${a.name}\n\nMembership No: ${
+          a.membership_no || "—"
+        }\n\nಈ member ಅನ್ನು ಮತ್ತೆ Approved Membersಗೆ ತರಬೇಕೇ?`
+      );
 
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     // Restore application
     const {
@@ -395,30 +578,27 @@ export default function Admin() {
 
     if (error) {
       alert(
-        "Member recover ಆಗಲಿಲ್ಲ:\n" +
+        "Recover ಆಗಲಿಲ್ಲ:\n\n" +
           error.message
       );
+
       return;
     }
 
     // Restore public page
-    const publicPageRestored =
+    const publicPage =
       await createPublicPage(
         a
       );
 
-    if (!publicPageRestored) {
+    if (!publicPage) {
       return;
     }
 
     await load();
 
-    setShowRecycleBin(
-      false
-    );
-
     alert(
-      `Member Successfully Recovered ✅\n\nMembership Number: ${
+      `Member Recovered Successfully ✅\n\nMembership Number: ${
         a.membership_no ||
         "—"
       }`
@@ -430,17 +610,20 @@ export default function Admin() {
   // =====================================================
 
   async function permanentDelete(
-    a: Application
+    a: any
   ) {
-    const ok = confirm(
-      `⚠️ PERMANENT DELETE\n\n${a.name}\nMembership No: ${
-        a.membership_no || "—"
-      }\n\nಈ member ಅನ್ನು databaseನಿಂದ ಸಂಪೂರ್ಣವಾಗಿ delete ಮಾಡಲಾಗುತ್ತದೆ.\n\nಇದನ್ನು ಮತ್ತೆ Recover ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.\n\nಮುಂದುವರಿಸಬೇಕೇ?`
-    );
+    const ok =
+      confirm(
+        `⚠️ PERMANENT DELETE\n\n${a.name}\nMembership No: ${
+          a.membership_no || "—"
+        }\n\nಈ member ಅನ್ನು databaseನಿಂದ ಸಂಪೂರ್ಣವಾಗಿ delete ಮಾಡಲಾಗುತ್ತದೆ.\n\nಇದನ್ನು Recover ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.\n\nಮುಂದುವರಿಸಬೇಕೇ?`
+      );
 
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
-    // Delete Public Page
+    // Delete public page first
     const {
       error: publicPageError,
     } = await supabase
@@ -450,13 +633,14 @@ export default function Admin() {
 
     if (publicPageError) {
       alert(
-        "Public Page delete ಆಗಲಿಲ್ಲ:\n" +
+        "Public Page delete ಆಗಲಿಲ್ಲ:\n\n" +
           publicPageError.message
       );
+
       return;
     }
 
-    // Delete Application
+    // Delete application
     const {
       error: applicationError,
     } = await supabase
@@ -466,9 +650,10 @@ export default function Admin() {
 
     if (applicationError) {
       alert(
-        "Member permanent delete ಆಗಲಿಲ್ಲ:\n" +
+        "Member permanent delete ಆಗಲಿಲ್ಲ:\n\n" +
           applicationError.message
       );
+
       return;
     }
 
@@ -495,9 +680,12 @@ export default function Admin() {
         .select("*")
         .eq("status", "approved")
         .eq("is_deleted", false)
-        .order("membership_no", {
-          ascending: true,
-        });
+        .order(
+          "membership_no",
+          {
+            ascending: true,
+          }
+        );
 
       if (error) {
         alert(error.message);
@@ -511,6 +699,7 @@ export default function Admin() {
         alert(
           "Approved Members ಯಾರೂ ಇಲ್ಲ."
         );
+
         return;
       }
 
@@ -522,29 +711,40 @@ export default function Admin() {
           ) => ({
             "Sl No":
               index + 1,
+
             "Membership Number":
               a.membership_no ||
               "",
+
             "Name":
               a.name || "",
+
             "Designation":
               a.designation ||
               "",
+
             "Village":
               a.village || "",
+
             "Taluk":
               a.taluk || "",
+
             "District":
               a.district ||
               "",
+
             "Mobile":
               a.mobile || "",
+
             "Aadhaar":
               a.aadhaar || "",
+
             "Status":
               a.status || "",
+
             "Application ID":
               a.id || "",
+
             "Created At":
               a.created_at
                 ? new Date(
@@ -602,7 +802,7 @@ export default function Admin() {
       console.error(error);
 
       alert(
-        "Excel generate ಆಗಲಿಲ್ಲ:\n" +
+        "Excel generate ಆಗಲಿಲ್ಲ:\n\n" +
           (error?.message ||
             "Unknown error")
       );
@@ -617,19 +817,20 @@ export default function Admin() {
 
   async function logout() {
     await supabase.auth.signOut();
+
     router.push(
       "/admin/login"
     );
   }
 
   // =====================================================
-  // ACTIVE / RECYCLE DATA
+  // ACTIVE / DELETED
   // =====================================================
 
   const activeApps =
     apps.filter(
       (a: any) =>
-        !a.is_deleted
+        a.is_deleted !== true
     );
 
   const recycleApps =
@@ -639,12 +840,12 @@ export default function Admin() {
     );
 
   // =====================================================
-  // FILTER ACTIVE MEMBERS
+  // SEARCH + FILTER
   // =====================================================
 
   const shown =
     activeApps.filter(
-      (a) => {
+      (a: any) => {
         const matchesStatus =
           status === "all" ||
           a.status === status;
@@ -675,21 +876,21 @@ export default function Admin() {
 
     pending:
       activeApps.filter(
-        (a) =>
+        (a: any) =>
           a.status ===
           "pending"
       ).length,
 
     approved:
       activeApps.filter(
-        (a) =>
+        (a: any) =>
           a.status ===
           "approved"
       ).length,
 
     rejected:
       activeApps.filter(
-        (a) =>
+        (a: any) =>
           a.status ===
           "rejected"
       ).length,
@@ -702,7 +903,10 @@ export default function Admin() {
   return (
     <main className="min-h-screen bg-slate-100">
 
-      {/* HEADER */}
+      {/* ==========================================
+          HEADER
+      ========================================== */}
+
       <header className="bg-slate-950 text-white">
 
         <div className="max-w-7xl mx-auto px-4 py-5 flex flex-wrap gap-4 justify-between items-center">
@@ -769,13 +973,123 @@ export default function Admin() {
             </button>
 
           </div>
+
         </div>
+
       </header>
 
-      {/* MAIN */}
+      {/* ==========================================
+          CONTENT
+      ========================================== */}
+
       <div className="max-w-7xl mx-auto px-4 py-8">
 
-        {/* RECYCLE BIN */}
+        {/* ========================================
+            MEMBERSHIP NUMBER SETTINGS
+        ======================================== */}
+
+        <section className="bg-white rounded-2xl shadow-sm p-5 mb-6">
+
+          <div className="flex flex-wrap items-end justify-between gap-5">
+
+            <div>
+
+              <h2 className="text-xl font-bold">
+                🔢 Membership Number Settings
+              </h2>
+
+              <p className="text-sm text-slate-500 mt-1">
+                ಹೊಸ memberಗೆ Membership Number ಯಾವ numberನಿಂದ ಆರಂಭವಾಗಬೇಕು ಎಂದು ಇಲ್ಲಿ set ಮಾಡಿ.
+              </p>
+
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+
+              <div>
+
+                <label className="block text-sm font-semibold mb-2">
+                  Starting Number
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={
+                    membershipStartNo
+                  }
+                  onChange={(e) =>
+                    setMembershipStartNo(
+                      e.target.value
+                    )
+                  }
+                  className="border border-slate-300 rounded-xl px-4 py-3 w-44 outline-none focus:ring-2 focus:ring-green-500"
+                />
+
+              </div>
+
+              <button
+                onClick={
+                  saveMembershipStartNumber
+                }
+                disabled={
+                  savingMembershipStart
+                }
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold"
+              >
+                {savingMembershipStart
+                  ? "Saving..."
+                  : "💾 Save Number"}
+              </button>
+
+            </div>
+
+          </div>
+
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+
+            <b>Example:</b>{" "}
+            Starting Number ={" "}
+            <b>
+              {membershipStartNo ||
+                "1"}
+            </b>
+
+            <br />
+
+            ಹೊಸ members:
+            {" "}
+            {membershipStartNo ||
+              "1"}
+            {" → "}
+            {(
+              Number(
+                membershipStartNo ||
+                  1
+              ) + 1
+            )}
+            {" → "}
+            {(
+              Number(
+                membershipStartNo ||
+                  1
+              ) + 2
+            )}
+            ...
+
+            <br />
+
+            Existing Membership Numbers
+            <b> ಬದಲಾಗುವುದಿಲ್ಲ.</b>
+
+          </div>
+
+        </section>
+
+        {/* ========================================
+            RECYCLE BIN
+        ======================================== */}
+
         {showRecycleBin && (
 
           <section className="bg-orange-50 border border-orange-200 rounded-2xl p-5 mb-6">
@@ -783,13 +1097,15 @@ export default function Admin() {
             <div className="flex flex-wrap justify-between items-center gap-3">
 
               <div>
+
                 <h2 className="text-xl font-bold text-orange-800">
                   ♻️ Recycle Bin
                 </h2>
 
                 <p className="text-sm text-orange-700 mt-1">
-                  ಇಲ್ಲಿ delete ಮಾಡಿದ members recover ಮಾಡಬಹುದು.
+                  Delete ಮಾಡಿದ members ಇಲ್ಲಿ ಇರುತ್ತಾರೆ.
                 </p>
+
               </div>
 
               <div className="bg-orange-200 text-orange-900 px-4 py-2 rounded-xl font-bold">
@@ -911,7 +1227,10 @@ export default function Admin() {
 
         )}
 
-        {/* COUNTS */}
+        {/* ========================================
+            COUNTS
+        ======================================== */}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
           {(
@@ -953,10 +1272,14 @@ export default function Admin() {
 
         </div>
 
-        {/* EXCEL */}
+        {/* ========================================
+            EXCEL
+        ======================================== */}
+
         <div className="bg-white rounded-2xl mt-6 p-5 shadow-sm flex flex-wrap gap-3 items-center justify-between">
 
           <div>
+
             <h2 className="font-bold text-lg">
               Approved Members
             </h2>
@@ -964,13 +1287,16 @@ export default function Admin() {
             <p className="text-sm text-slate-500 mt-1">
               Active approved members ಮಾತ್ರ Excelಗೆ ಬರುತ್ತಾರೆ.
             </p>
+
           </div>
 
           <button
             onClick={
               downloadApprovedExcel
             }
-            disabled={exporting}
+            disabled={
+              exporting
+            }
             className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold"
           >
             {exporting
@@ -980,7 +1306,10 @@ export default function Admin() {
 
         </div>
 
-        {/* SEARCH + TABLE */}
+        {/* ========================================
+            SEARCH
+        ======================================== */}
+
         <div className="bg-white rounded-2xl mt-6 shadow-sm overflow-hidden">
 
           <div className="p-4">
@@ -997,6 +1326,10 @@ export default function Admin() {
             />
 
           </div>
+
+          {/* ======================================
+              TABLE
+          ====================================== */}
 
           {loading ? (
 
@@ -1052,7 +1385,7 @@ export default function Admin() {
                 <tbody>
 
                   {shown.map(
-                    (a) => (
+                    (a: any) => (
 
                       <tr
                         key={a.id}
