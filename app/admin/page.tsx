@@ -1075,7 +1075,7 @@ export default function Admin() {
 
       <header className="bg-slate-950 text-white">
 
-        <div className="max-w-7xl mx-auto px-4 py-5 flex flex-wrap gap-4 justify-between items-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5 flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
 
           <div>
             <h1 className="text-xl font-bold">
@@ -1087,25 +1087,25 @@ export default function Admin() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
 
             <Link
               href="/admin/editor"
-              className="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg"
+              className="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               Website Editor
             </Link>
 
             <Link
               href="/admin/card"
-              className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg"
+              className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               PVC Designer
             </Link>
 
             <Link
               href="/admin/bulk-cards"
-              className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg font-semibold"
+              className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg font-semibold text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               📥 Bulk PVC Cards
             </Link>
@@ -1117,7 +1117,7 @@ export default function Admin() {
               disabled={
                 exporting
               }
-              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg font-semibold"
+              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg font-semibold text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               {exporting
                 ? "Preparing Excel..."
@@ -1130,7 +1130,7 @@ export default function Admin() {
                   !showRecycleBin
                 )
               }
-              className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg font-semibold"
+              className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg font-semibold text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               ♻️ Recycle Bin
 
@@ -1143,7 +1143,7 @@ export default function Admin() {
               onClick={
                 logout
               }
-              className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg"
+              className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-sm sm:text-base flex-1 sm:flex-none text-center"
             >
               Logout
             </button>
@@ -1158,15 +1158,15 @@ export default function Admin() {
           MAIN
       ========================================== */}
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
 
         {/* ========================================
             MEMBERSHIP NUMBER SETTINGS
         ======================================== */}
 
-        <section className="bg-white rounded-2xl shadow-sm p-5 mb-6">
+        <section className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 mb-6">
 
-          <div className="flex flex-wrap items-end justify-between gap-5">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
 
             <div>
 
@@ -1180,7 +1180,7 @@ export default function Admin() {
 
             </div>
 
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 w-full lg:w-auto">
 
               <div>
 
@@ -1199,7 +1199,7 @@ export default function Admin() {
                       e.target.value
                     )
                   }
-                  className="border border-slate-300 rounded-xl px-4 py-3 w-44 outline-none focus:ring-2 focus:ring-green-500"
+                  className="border border-slate-300 rounded-xl px-4 py-3 w-full sm:w-44 outline-none focus:ring-2 focus:ring-green-500"
                 />
 
               </div>
@@ -1211,7 +1211,7 @@ export default function Admin() {
                 disabled={
                   savingMembershipStart
                 }
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold"
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold w-full sm:w-auto"
               >
                 {savingMembershipStart
                   ? "Saving..."
@@ -1307,7 +1307,7 @@ export default function Admin() {
             ) : (
               <div className="overflow-x-auto mt-4">
 
-                <table className="w-full bg-white rounded-xl overflow-hidden">
+                <table className="w-full bg-white rounded-xl overflow-hidden min-w-[720px]">
 
                   <thead className="bg-orange-100">
 
@@ -1363,7 +1363,7 @@ export default function Admin() {
 
                           <td className="p-3">
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
 
                               <button
                                 onClick={() =>
@@ -1456,7 +1456,7 @@ export default function Admin() {
             EXCEL
         ======================================== */}
 
-        <div className="bg-white rounded-2xl mt-6 p-5 shadow-sm flex flex-wrap gap-3 items-center justify-between">
+        <div className="bg-white rounded-2xl mt-6 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
 
           <div>
 
@@ -1477,7 +1477,7 @@ export default function Admin() {
             disabled={
               exporting
             }
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold"
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl font-bold w-full sm:w-auto"
           >
             {exporting
               ? "Generating..."
@@ -1523,7 +1523,7 @@ export default function Admin() {
           ) : (
             <div className="overflow-x-auto">
 
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[900px]">
 
                 <thead className="bg-slate-50">
 
@@ -1609,7 +1609,7 @@ export default function Admin() {
 
                         <td className="p-3">
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
 
                             <Link
                               href={`/admin/application?id=${a.id}`}
