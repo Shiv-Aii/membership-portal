@@ -762,12 +762,14 @@ function CardDesigner() {
            QR
         ------------------------------------------------- */
 
-        const publicPageUrl =
-          `${window.location.origin}/public-page?id=${data.id}`;
+        const verificationUrl =
+          `${window.location.origin}/verify?membership=${encodeURIComponent(
+            String(data.membership_no || "")
+          )}`;
 
         const qrImage =
           await QRCode.toDataURL(
-            publicPageUrl,
+            verificationUrl,
             {
               width: 800,
               margin: 1,
