@@ -1,6 +1,7 @@
-"use client";
+ "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Member = {
@@ -18,6 +19,8 @@ type Member = {
 };
 
 export default function VerifyMemberPage() {
+  const searchParams = useSearchParams();
+
   const [membershipNo, setMembershipNo] =
     useState("");
 
@@ -30,17 +33,26 @@ export default function VerifyMemberPage() {
   const [searched, setSearched] =
     useState(false);
 
-  async function verifyMember() {
+  async function verifyMember(
+    numberFromUrl?: string
+  ) {
     const number =
-      membershipNo.trim();
+      (
+        numberFromUrl ??
+        membershipNo
+      ).trim();
 
     if (!number) {
-      alert(
-        "Membership Number ಹಾಕಿ."
-      );
+      if (!numberFromUrl) {
+        alert(
+          "Membership Number ಹಾಕಿ."
+        );
+      }
+
       return;
     }
 
+    setMembershipNo(number);
     setLoading(true);
     setMember(null);
     setSearched(true);
@@ -81,9 +93,7 @@ export default function VerifyMemberPage() {
         .maybeSingle();
 
       if (error) {
-        console.error(
-          error
-        );
+        console.error(error);
 
         alert(
           "Verification error:\n\n" +
@@ -105,6 +115,31 @@ export default function VerifyMemberPage() {
       setLoading(false);
     }
   }
+
+  /*
+   * QR scan ಮಾಡಿದಾಗ:
+   *
+   * /verify?membership=10
+   *
+   * URLನ membership number automatic ಆಗಿ ತೆಗೆದುಕೊಂಡು
+   * member verification ಮಾಡುತ್ತದೆ.
+   */
+  useEffect(() => {
+    const number =
+      searchParams.get(
+        "membership"
+      );
+
+    if (number) {
+      setMembershipNo(
+        number
+      );
+
+      verifyMember(
+        number
+      );
+    }
+  }, [searchParams]);
 
   function handleKeyDown(
     e: React.KeyboardEvent<HTMLInputElement>
@@ -129,8 +164,6 @@ export default function VerifyMemberPage() {
   return (
     <main className="min-h-screen bg-slate-100">
 
-      {/* HEADER */}
-
       <header className="bg-slate-950 text-white">
 
         <div className="max-w-4xl mx-auto px-4 py-6 text-center">
@@ -148,11 +181,7 @@ export default function VerifyMemberPage() {
 
       </header>
 
-      {/* MAIN */}
-
       <div className="max-w-2xl mx-auto px-4 py-8">
-
-        {/* SEARCH CARD */}
 
         <section className="bg-white rounded-2xl shadow-sm p-5 sm:p-7">
 
@@ -161,7 +190,8 @@ export default function VerifyMemberPage() {
           </h2>
 
           <p className="text-sm text-slate-500 text-center mt-2">
-            ನಿಮ್ಮ Membership Number ನಮೂದಿಸಿ
+            Membership Number ನಮೂದಿಸಿ
+            ಅಥವಾ PVC Card QR scan ಮಾಡಿ
           </p>
 
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
@@ -185,8 +215,8 @@ export default function VerifyMemberPage() {
             />
 
             <button
-              onClick={
-                verifyMember
+              onClick={() =>
+                verifyMember()
               }
               disabled={
                 loading
@@ -200,9 +230,22 @@ export default function VerifyMemberPage() {
 
           </div>
 
-        </section>
+          {searchParams.get(
+            "membership"
+          ) && (
+            <div className="mt-4 text-center text-sm text-blue-600">
+              QR Verification Number:{" "}
+              <b>
+                {
+                  searchParams.get(
+                    "membership"
+                  )
+                }
+              </b>
+            </div>
+          )}
 
-        {/* NOT FOUND */}
+        </section>
 
         {searched &&
           !loading &&
@@ -226,12 +269,8 @@ export default function VerifyMemberPage() {
             </section>
           )}
 
-        {/* MEMBER RESULT */}
-
         {member && (
           <section className="bg-white rounded-2xl shadow-sm mt-5 overflow-hidden">
-
-            {/* VERIFIED HEADER */}
 
             <div className="bg-green-600 text-white p-5 text-center">
 
@@ -249,14 +288,11 @@ export default function VerifyMemberPage() {
 
             </div>
 
-            {/* MEMBER */}
-
             <div className="p-5 sm:p-7">
 
               <div className="flex flex-col items-center">
 
                 {member.photo_url ? (
-
                   <img
                     src={
                       member.photo_url
@@ -267,13 +303,10 @@ export default function VerifyMemberPage() {
                     }
                     className="w-32 h-36 sm:w-36 sm:h-40 object-cover rounded-xl border-4 border-white shadow-md"
                   />
-
                 ) : (
-
                   <div className="w-32 h-36 sm:w-36 sm:h-40 bg-slate-200 rounded-xl flex items-center justify-center text-5xl">
                     👤
                   </div>
-
                 )}
 
                 <h2 className="text-2xl font-bold mt-4 text-center">
@@ -289,8 +322,6 @@ export default function VerifyMemberPage() {
                 </div>
 
               </div>
-
-              {/* DETAILS */}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-7">
 
@@ -338,8 +369,6 @@ export default function VerifyMemberPage() {
                 </div>
               )}
 
-              {/* VERIFIED */}
-
               <div className="mt-6 border border-green-200 bg-green-50 rounded-xl p-4 text-center">
 
                 <div className="text-green-700 font-bold">
@@ -362,10 +391,6 @@ export default function VerifyMemberPage() {
     </main>
   );
 }
-
-/* =====================================================
-   INFO COMPONENT
-===================================================== */
 
 function Info({
   label,
