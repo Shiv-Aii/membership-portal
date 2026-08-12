@@ -14,7 +14,6 @@ import jsPDF from "jspdf";
 import { useSearchParams } from "next/navigation";
 
 type Side = "front" | "back";
-
 type ElementType = "text" | "image";
 
 type CardElement = {
@@ -79,16 +78,14 @@ function CardDesigner() {
   const [elements, setElements] =
     useState<CardElement[]>([]);
 
-  const [message, setMessage] = useState("");
+  const [message, setMessage] =
+    useState("");
 
   const [generating, setGenerating] =
     useState(false);
 
-  const frontPreviewRef =
-    useRef<HTMLDivElement>(null);
-
-  const backPreviewRef =
-    useRef<HTMLDivElement>(null);
+  const dragRef =
+    useRef<DragState | null>(null);
 
   const frontPdfRef =
     useRef<HTMLDivElement>(null);
@@ -96,13 +93,14 @@ function CardDesigner() {
   const backPdfRef =
     useRef<HTMLDivElement>(null);
 
-  const dragRef =
-    useRef<DragState | null>(null);
-
   /*
    * Display scale.
-   * 1 mm = 5px
+   *
+   * PVC 85.6 × 53.9 mm
+   * becomes approximately
+   * 428 × 270 px.
    */
+
   const PX_PER_MM = 5;
 
   const displayWidth =
@@ -112,184 +110,335 @@ function CardDesigner() {
     cardHeight * PX_PER_MM;
 
   /*
-   * -----------------------------------------
-   * DEFAULT DESIGN
-   * -----------------------------------------
+   * =========================================
+   * DEFAULT ELEMENTS
+   * =========================================
    */
 
   function createDefaultElements(
     data: any
   ): CardElement[] {
     return [
+      /*
+       * FRONT HEADING
+       */
+
       {
         id: "front-heading",
         type: "text",
         side: "front",
+
         x: 0,
         y: 0,
+
         width: displayWidth,
         height: 55,
+
         text: "ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್",
+
         fontSize: 20,
         fontWeight: "700",
+
         color: "#ffffff",
-        background:
-          "linear-gradient(90deg,#15803d,#2563eb)",
+
+        /*
+         * Solid colour is more
+         * reliable in html2canvas/PDF.
+         */
+
+        background: "#166534",
+
         textAlign: "center",
+
         radius: 0,
       },
+
+      /*
+       * NAME
+       */
 
       {
         id: "front-name",
         type: "text",
         side: "front",
+
         x: 110,
         y: 75,
+
         width: 180,
         height: 30,
-        text: `ಹೆಸರು: ${data?.name || "-"}`,
+
+        text:
+          `ಹೆಸರು: ${
+            data?.name || "-"
+          }`,
+
         fontSize: 13,
         fontWeight: "600",
+
         color: "#111827",
+
         textAlign: "left",
       },
+
+      /*
+       * DESIGNATION
+       */
 
       {
         id: "front-designation",
         type: "text",
         side: "front",
+
         x: 110,
         y: 108,
+
         width: 180,
         height: 30,
-        text: `ಹುದ್ದೆ: ${
-          data?.designation || "-"
-        }`,
+
+        text:
+          `ಹುದ್ದೆ: ${
+            data?.designation || "-"
+          }`,
+
         fontSize: 13,
         fontWeight: "500",
+
         color: "#111827",
+
         textAlign: "left",
       },
+
+      /*
+       * VILLAGE
+       */
 
       {
         id: "front-village",
         type: "text",
         side: "front",
+
         x: 110,
         y: 141,
+
         width: 180,
         height: 30,
-        text: `ಗ್ರಾಮ: ${
-          data?.village || "-"
-        }`,
+
+        text:
+          `ಗ್ರಾಮ: ${
+            data?.village || "-"
+          }`,
+
         fontSize: 13,
         fontWeight: "500",
+
         color: "#111827",
+
         textAlign: "left",
       },
+
+      /*
+       * MOBILE
+       */
 
       {
         id: "front-mobile",
         type: "text",
         side: "front",
+
         x: 110,
         y: 174,
+
         width: 180,
         height: 30,
-        text: `ಮೊಬೈಲ್: ${
-          data?.mobile || "-"
-        }`,
+
+        text:
+          `ಮೊಬೈಲ್: ${
+            data?.mobile || "-"
+          }`,
+
         fontSize: 13,
         fontWeight: "500",
+
         color: "#111827",
+
         textAlign: "left",
       },
+
+      /*
+       * MEMBER ID
+       */
 
       {
         id: "front-member-id",
         type: "text",
         side: "front",
+
         x: 110,
         y: 207,
+
         width: 180,
         height: 30,
-        text: `Member ID: ${
-          data?.membership_no || "-"
-        }`,
+
+        text:
+          `Member ID: ${
+            data?.membership_no || "-"
+          }`,
+
         fontSize: 13,
         fontWeight: "700",
+
         color: "#111827",
+
         textAlign: "left",
       },
+
+      /*
+       * MEMBER PHOTO
+       */
 
       {
         id: "front-photo",
         type: "image",
         side: "front",
+
         x: 20,
         y: 75,
+
         width: 75,
         height: 110,
-        src: data?.photo_url || "",
+
+        src:
+          data?.photo_url || "",
+
         radius: 10,
       },
+
+      /*
+       * QR CODE
+       *
+       * IMPORTANT:
+       * QR is now a normal element.
+       * Therefore it can be:
+       *
+       * - selected
+       * - dragged
+       * - resized
+       * - deleted
+       * - positioned with X/Y
+       */
+
+      {
+        id: "front-qr",
+        type: "image",
+        side: "front",
+
+        x:
+          displayWidth - 95,
+
+        y:
+          displayHeight - 95,
+
+        width: 70,
+        height: 70,
+
+        src: "",
+
+        radius: 0,
+      },
+
+      /*
+       * BACK HEADING
+       */
 
       {
         id: "back-heading",
         type: "text",
         side: "back",
+
         x: 0,
         y: 0,
+
         width: displayWidth,
         height: 55,
-        text: "ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ",
+
+        text:
+          "ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ",
+
         fontSize: 20,
         fontWeight: "700",
+
         color: "#ffffff",
-        background:
-          "linear-gradient(90deg,#2563eb,#15803d)",
+
+        background: "#1d4ed8",
+
         textAlign: "center",
+
         radius: 0,
       },
+
+      /*
+       * BACK INFORMATION
+       */
 
       {
         id: "back-info",
         type: "text",
         side: "back",
+
         x: 35,
         y: 90,
-        width: displayWidth - 70,
+
+        width:
+          displayWidth - 70,
+
         height: 70,
+
         text:
           "ಈ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್ ಅಧಿಕೃತ ಸದಸ್ಯತ್ವದ ಗುರುತಾಗಿದೆ.",
+
         fontSize: 14,
         fontWeight: "500",
+
         color: "#111827",
+
         textAlign: "center",
       },
+
+      /*
+       * BACK CONTACT
+       */
 
       {
         id: "back-contact",
         type: "text",
         side: "back",
+
         x: 35,
         y: 175,
-        width: displayWidth - 70,
+
+        width:
+          displayWidth - 70,
+
         height: 50,
+
         text:
           "ಸಂಪರ್ಕಕ್ಕಾಗಿ ಸಂಸ್ಥೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+
         fontSize: 12,
         fontWeight: "500",
+
         color: "#475569",
+
         textAlign: "center",
       },
     ];
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * LOAD MEMBER
-   * -----------------------------------------
+   * =========================================
    */
 
   useEffect(() => {
@@ -323,8 +472,9 @@ function CardDesigner() {
         setMember(data);
 
         /*
-         * QR URL
+         * Generate QR
          */
+
         const publicPageUrl =
           `${window.location.origin}/public-page?id=${data.id}`;
 
@@ -334,14 +484,16 @@ function CardDesigner() {
             {
               width: 500,
               margin: 2,
+              errorCorrectionLevel: "H",
             }
           );
 
         setQr(qrImage);
 
         /*
-         * Restore saved design
+         * Load saved design
          */
+
         const saved =
           localStorage.getItem(
             `pvc-designer-${data.id}`
@@ -357,13 +509,81 @@ function CardDesigner() {
                 parsed.elements
               )
             ) {
+              let savedElements =
+                parsed.elements as CardElement[];
+
+              /*
+               * OLD DESIGN COMPATIBILITY
+               *
+               * If old QR was not an element,
+               * add it now.
+               */
+
+              const qrExists =
+                savedElements.some(
+                  (el) =>
+                    el.id ===
+                    "front-qr"
+                );
+
+              if (!qrExists) {
+                savedElements = [
+                  ...savedElements,
+
+                  {
+                    id: "front-qr",
+
+                    type: "image",
+
+                    side: "front",
+
+                    x:
+                      displayWidth -
+                      95,
+
+                    y:
+                      displayHeight -
+                      95,
+
+                    width: 70,
+                    height: 70,
+
+                    src: qrImage,
+
+                    radius: 0,
+                  },
+                ];
+              } else {
+                savedElements =
+                  savedElements.map(
+                    (el) =>
+                      el.id ===
+                      "front-qr"
+                        ? {
+                            ...el,
+                            src:
+                              qrImage,
+                          }
+                        : el
+                  );
+              }
+
               setElements(
-                parsed.elements
+                savedElements
               );
             } else {
               setElements(
                 createDefaultElements(
                   data
+                ).map((el) =>
+                  el.id ===
+                  "front-qr"
+                    ? {
+                        ...el,
+                        src:
+                          qrImage,
+                      }
+                    : el
                 )
               );
             }
@@ -377,7 +597,9 @@ function CardDesigner() {
               );
 
               setWidthInput(
-                String(parsed.width)
+                String(
+                  parsed.width
+                )
               );
             }
 
@@ -390,13 +612,24 @@ function CardDesigner() {
               );
 
               setHeightInput(
-                String(parsed.height)
+                String(
+                  parsed.height
+                )
               );
             }
           } catch {
             setElements(
               createDefaultElements(
                 data
+              ).map((el) =>
+                el.id ===
+                "front-qr"
+                  ? {
+                      ...el,
+                      src:
+                        qrImage,
+                    }
+                  : el
               )
             );
           }
@@ -404,6 +637,13 @@ function CardDesigner() {
           setElements(
             createDefaultElements(
               data
+            ).map((el) =>
+              el.id === "front-qr"
+                ? {
+                    ...el,
+                    src: qrImage,
+                  }
+                : el
             )
           );
         }
@@ -422,14 +662,13 @@ function CardDesigner() {
   }, [id]);
 
   /*
-   * -----------------------------------------
+   * =========================================
    * AUTO SAVE
-   * -----------------------------------------
+   * =========================================
    */
 
   useEffect(() => {
     if (!member?.id) return;
-
     if (!elements.length) return;
 
     localStorage.setItem(
@@ -448,9 +687,9 @@ function CardDesigner() {
   ]);
 
   /*
-   * -----------------------------------------
+   * =========================================
    * UPDATE ELEMENT
-   * -----------------------------------------
+   * =========================================
    */
 
   function updateElement(
@@ -472,9 +711,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
-   * DELETE
-   * -----------------------------------------
+   * =========================================
+   * DELETE ELEMENT
+   * =========================================
    */
 
   function deleteElement(
@@ -493,17 +732,20 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * ADD TEXT
-   * -----------------------------------------
+   * =========================================
    */
 
   function addText() {
     if (locked) return;
 
     const newElement: CardElement = {
-      id: `text-${Date.now()}`,
+      id:
+        `text-${Date.now()}`,
+
       type: "text",
+
       side,
 
       x: 50,
@@ -515,6 +757,7 @@ function CardDesigner() {
       text: "ಹೊಸ Text",
 
       fontSize: 16,
+
       fontWeight: "500",
 
       color: "#111827",
@@ -535,9 +778,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * ADD IMAGE
-   * -----------------------------------------
+   * =========================================
    */
 
   function addImage(file: File) {
@@ -547,30 +790,35 @@ function CardDesigner() {
       new FileReader();
 
     reader.onload = () => {
-      const newElement: CardElement = {
-        id: `image-${Date.now()}`,
+      const newElement: CardElement =
+        {
+          id:
+            `image-${Date.now()}`,
 
-        type: "image",
+          type: "image",
 
-        side,
+          side,
 
-        x: 80,
-        y: 100,
+          x: 80,
+          y: 100,
 
-        width: 120,
-        height: 100,
+          width: 120,
+          height: 100,
 
-        src: String(
-          reader.result
-        ),
+          src:
+            String(
+              reader.result
+            ),
 
-        radius: 8,
-      };
+          radius: 8,
+        };
 
-      setElements((old) => [
-        ...old,
-        newElement,
-      ]);
+      setElements(
+        (old) => [
+          ...old,
+          newElement,
+        ]
+      );
 
       setSelectedId(
         newElement.id
@@ -581,9 +829,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * DRAG START
-   * -----------------------------------------
+   * =========================================
    */
 
   function startDrag(
@@ -619,9 +867,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * DRAG MOVE
-   * -----------------------------------------
+   * =========================================
    */
 
   function moveDrag(
@@ -695,9 +943,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * DRAG END
-   * -----------------------------------------
+   * =========================================
    */
 
   function stopDrag(
@@ -715,9 +963,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * CARD SIZE
-   * -----------------------------------------
+   * =========================================
    */
 
   function applySize() {
@@ -767,9 +1015,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
-   * SELECTED ELEMENT
-   * -----------------------------------------
+   * =========================================
+   * SELECTED
+   * =========================================
    */
 
   const selected =
@@ -779,29 +1027,55 @@ function CardDesigner() {
     ) || null;
 
   /*
-   * -----------------------------------------
+   * =========================================
    * RENDER ELEMENT
    *
-   * IMPORTANT:
-   * PDF rendering MUST NOT depend
-   * on current "side" state.
-   * -----------------------------------------
+   * Preview:
+   * only current side.
+   *
+   * PDF:
+   * element is already filtered by
+   * Front / Back container.
+   * =========================================
    */
 
   function renderElement(
     element: CardElement,
     isPdf = false
   ) {
-    /*
-     * Only normal preview depends on
-     * selected Front / Back tab.
-     *
-     * PDF render sends elements explicitly,
-     * therefore we don't filter here.
-     */
-    if (!isPdf && element.side !== side) {
+    if (
+      !isPdf &&
+      element.side !== side
+    ) {
       return null;
     }
+
+    /*
+     * IMPORTANT:
+     *
+     * Heading width is always
+     * current card width.
+     *
+     * This prevents old 428px
+     * heading width from appearing
+     * incorrectly after custom size.
+     */
+
+    const finalWidth =
+      element.id ===
+        "front-heading" ||
+      element.id ===
+        "back-heading"
+        ? displayWidth
+        : element.width;
+
+    const finalHeight =
+      element.id ===
+        "front-heading" ||
+      element.id ===
+        "back-heading"
+        ? 55
+        : element.height;
 
     const isSelected =
       selectedId ===
@@ -817,14 +1091,16 @@ function CardDesigner() {
         position: "absolute",
 
         left: element.x,
+
         top: element.y,
 
-        width: element.width,
-        height: element.height,
+        width: finalWidth,
+
+        height: finalHeight,
 
         zIndex:
           isSelected
-            ? 100
+            ? 1000
             : 10,
 
         boxSizing:
@@ -860,11 +1136,12 @@ function CardDesigner() {
       };
 
     /*
-     * TEXT
+     * TEXT ELEMENT
      */
 
     if (
-      element.type === "text"
+      element.type ===
+      "text"
     ) {
       return (
         <div
@@ -897,10 +1174,14 @@ function CardDesigner() {
         >
           <div
             style={{
-              width: "100%",
-              height: "100%",
+              width:
+                "100%",
 
-              display: "flex",
+              height:
+                "100%",
+
+              display:
+                "flex",
 
               alignItems:
                 "center",
@@ -914,7 +1195,13 @@ function CardDesigner() {
                   ? "flex-end"
                   : "center",
 
-              padding: 6,
+              padding:
+                element.id ===
+                  "front-heading" ||
+                element.id ===
+                  "back-heading"
+                  ? 8
+                  : 6,
 
               fontSize:
                 element.fontSize ||
@@ -932,7 +1219,8 @@ function CardDesigner() {
                 element.textAlign ||
                 "center",
 
-              lineHeight: 1.2,
+              lineHeight:
+                1.2,
 
               whiteSpace:
                 "pre-wrap",
@@ -948,7 +1236,7 @@ function CardDesigner() {
     }
 
     /*
-     * IMAGE
+     * IMAGE ELEMENT
      */
 
     return (
@@ -987,10 +1275,17 @@ function CardDesigner() {
             draggable={false}
             crossOrigin="anonymous"
             style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
+              width:
+                "100%",
+
+              height:
+                "100%",
+
+              objectFit:
+                "cover",
+
+              display:
+                "block",
             }}
           />
         ) : (
@@ -1003,9 +1298,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
-   * NORMAL CARD PREVIEW
-   * -----------------------------------------
+   * =========================================
+   * CARD PREVIEW
+   * =========================================
    */
 
   function CardPreview() {
@@ -1019,13 +1314,17 @@ function CardDesigner() {
       <div
         className="relative overflow-hidden bg-white"
         style={{
-          width: displayWidth,
-          height: displayHeight,
+          width:
+            displayWidth,
+
+          height:
+            displayHeight,
 
           background:
             "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
 
-          borderRadius: 14,
+          borderRadius:
+            14,
 
           border:
             "1px solid #cbd5e1",
@@ -1036,7 +1335,9 @@ function CardDesigner() {
           flexShrink: 0,
         }}
         onClick={() => {
-          setSelectedId(null);
+          setSelectedId(
+            null
+          );
         }}
       >
         {visibleElements.map(
@@ -1046,49 +1347,14 @@ function CardDesigner() {
               false
             )
         )}
-
-        {/* QR */}
-
-        {qr &&
-          side === "front" && (
-            <div
-              style={{
-                position:
-                  "absolute",
-
-                right: 15,
-                bottom: 15,
-
-                width: 70,
-                height: 70,
-
-                zIndex: 500,
-              }}
-              onClick={(e) =>
-                e.stopPropagation()
-              }
-            >
-              <img
-                src={qr}
-                alt="QR"
-                draggable={false}
-                crossOrigin="anonymous"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "block",
-                }}
-              />
-            </div>
-          )}
       </div>
     );
   }
 
   /*
-   * -----------------------------------------
-   * WAIT FOR IMAGES
-   * -----------------------------------------
+   * =========================================
+   * WAIT IMAGES
+   * =========================================
    */
 
   async function waitForImages(
@@ -1113,11 +1379,13 @@ function CardDesigner() {
                 return;
               }
 
-              img.onload = () =>
-                resolve();
+              img.onload =
+                () =>
+                  resolve();
 
-              img.onerror = () =>
-                resolve();
+              img.onerror =
+                () =>
+                  resolve();
             }
           )
       )
@@ -1125,9 +1393,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * GENERATE PDF
-   * -----------------------------------------
+   * =========================================
    */
 
   async function generatePDF() {
@@ -1145,24 +1413,27 @@ function CardDesigner() {
 
     try {
       setGenerating(true);
+
       setMessage(
         "PDF generating..."
       );
 
       /*
-       * Allow browser to paint
+       * Wait for React/browser paint.
        */
+
       await new Promise(
         (resolve) =>
           setTimeout(
             resolve,
-            500
+            700
           )
       );
 
       /*
-       * Wait for photos + QR
+       * Wait for images.
        */
+
       await waitForImages(
         frontPdfRef.current
       );
@@ -1172,7 +1443,7 @@ function CardDesigner() {
       );
 
       /*
-       * Capture FRONT
+       * FRONT
        */
 
       const frontCanvas =
@@ -1198,11 +1469,15 @@ function CardDesigner() {
 
             height:
               displayHeight,
+
+            scrollX: 0,
+
+            scrollY: 0,
           }
         );
 
       /*
-       * Capture BACK
+       * BACK
        */
 
       const backCanvas =
@@ -1228,6 +1503,10 @@ function CardDesigner() {
 
             height:
               displayHeight,
+
+            scrollX: 0,
+
+            scrollY: 0,
           }
         );
 
@@ -1244,7 +1523,7 @@ function CardDesigner() {
         );
 
       /*
-       * PDF orientation
+       * Exact PDF dimensions.
        */
 
       const orientation =
@@ -1252,10 +1531,6 @@ function CardDesigner() {
         cardHeight
           ? "landscape"
           : "portrait";
-
-      /*
-       * EXACT CARD SIZE
-       */
 
       const pdf =
         new jsPDF({
@@ -1272,7 +1547,9 @@ function CardDesigner() {
         });
 
       /*
-       * PAGE 1 - FRONT
+       * PAGE 1
+       *
+       * FRONT
        */
 
       pdf.addImage(
@@ -1287,7 +1564,9 @@ function CardDesigner() {
       );
 
       /*
-       * PAGE 2 - BACK
+       * PAGE 2
+       *
+       * BACK
        */
 
       pdf.addPage(
@@ -1310,7 +1589,7 @@ function CardDesigner() {
       );
 
       /*
-       * FILE NAME
+       * DOWNLOAD
        */
 
       const fileName =
@@ -1319,7 +1598,9 @@ function CardDesigner() {
           "member"
         }-PVC.pdf`;
 
-      pdf.save(fileName);
+      pdf.save(
+        fileName
+      );
 
       setMessage(
         `✅ PDF ready — Front + Back (${cardWidth} × ${cardHeight} mm)`
@@ -1331,7 +1612,7 @@ function CardDesigner() {
       );
 
       setMessage(
-        "❌ PDF generate ಆಗಲಿಲ್ಲ. Console error check ಮಾಡಿ."
+        "❌ PDF generate ಆಗಲಿಲ್ಲ."
       );
 
       alert(
@@ -1343,9 +1624,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * SAVE MASTER
-   * -----------------------------------------
+   * =========================================
    */
 
   function saveMaster() {
@@ -1366,9 +1647,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * LOADING
-   * -----------------------------------------
+   * =========================================
    */
 
   if (loading) {
@@ -1388,9 +1669,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * MEMBER ERROR
-   * -----------------------------------------
+   * =========================================
    */
 
   if (!member) {
@@ -1410,9 +1691,9 @@ function CardDesigner() {
   }
 
   /*
-   * -----------------------------------------
+   * =========================================
    * MAIN UI
-   * -----------------------------------------
+   * =========================================
    */
 
   return (
@@ -1453,7 +1734,9 @@ function CardDesigner() {
               onClick={
                 saveMaster
               }
-              disabled={locked}
+              disabled={
+                locked
+              }
               className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50"
             >
               💾 Save Master
@@ -1484,11 +1767,13 @@ function CardDesigner() {
           </div>
         )}
 
-        {/* MAIN GRID */}
+        {/* MAIN */}
 
         <div className="grid lg:grid-cols-[1fr_390px] gap-5">
 
-          {/* LEFT */}
+          {/* ==============================
+              CARD PREVIEW
+          ============================== */}
 
           <div className="bg-white rounded-2xl p-5 shadow overflow-auto">
 
@@ -1507,7 +1792,8 @@ function CardDesigner() {
                       )
                     }
                     className={`px-5 py-2 rounded-xl font-bold ${
-                      side === "front"
+                      side ===
+                      "front"
                         ? "bg-blue-600 text-white"
                         : "bg-slate-100"
                     }`}
@@ -1522,7 +1808,8 @@ function CardDesigner() {
                       )
                     }
                     className={`px-5 py-2 rounded-xl font-bold ${
-                      side === "back"
+                      side ===
+                      "back"
                         ? "bg-blue-600 text-white"
                         : "bg-slate-100"
                     }`}
@@ -1533,43 +1820,43 @@ function CardDesigner() {
                 </div>
 
                 <p className="font-semibold mb-2">
-                  {side === "front"
+                  {side ===
+                  "front"
                     ? "Front Preview"
                     : "Back Preview"}
                 </p>
 
-                <div
-                  className="overflow-auto"
-                  style={{
-                    maxWidth:
-                      "100%",
-                  }}
-                >
-                  <div
-                    ref={
-                      side === "front"
-                        ? frontPreviewRef
-                        : backPreviewRef
-                    }
-                  >
-                    <CardPreview />
-                  </div>
+                <div className="overflow-auto">
+
+                  <CardPreview />
+
                 </div>
 
               </div>
+
             </div>
 
             <div className="mt-5 bg-slate-50 rounded-xl p-4 text-sm text-slate-600">
-              💡 Cardನಲ್ಲಿ text/image ಮೇಲೆ click ಮಾಡಿ.
+
+              💡 Cardನಲ್ಲಿ ಯಾವುದೇ
+              text / image / QR ಮೇಲೆ click ಮಾಡಿ.
+
               <br />
-              Mouse ಅಥವಾ touch ಮೂಲಕ drag ಮಾಡಿ.
+
+              Drag ಮಾಡಿ position ಬದಲಿಸಿ.
+
               <br />
-              Right sideನಲ್ಲಿ edit ಮಾಡಿ.
+
+              Right side Edit Sectionನಲ್ಲಿ
+              text, size, X/Y ಬದಲಾಯಿಸಬಹುದು.
+
             </div>
 
           </div>
 
-          {/* RIGHT EDIT SECTION */}
+          {/* ==============================
+              EDIT SECTION
+          ============================== */}
 
           <div className="bg-white rounded-2xl shadow">
 
@@ -1600,7 +1887,8 @@ function CardDesigner() {
                     )
                   }
                   className={`py-3 rounded-xl font-bold ${
-                    side === "front"
+                    side ===
+                    "front"
                       ? "bg-blue-600 text-white"
                       : "bg-slate-100"
                   }`}
@@ -1615,7 +1903,8 @@ function CardDesigner() {
                     )
                   }
                   className={`py-3 rounded-xl font-bold ${
-                    side === "back"
+                    side ===
+                    "back"
                       ? "bg-blue-600 text-white"
                       : "bg-slate-100"
                   }`}
@@ -1711,7 +2000,7 @@ function CardDesigner() {
 
               </div>
 
-              {/* ADD ELEMENTS */}
+              {/* ADD */}
 
               <div className="mt-5 border rounded-2xl p-4">
 
@@ -1793,7 +2082,17 @@ function CardDesigner() {
 
                   </div>
 
-                  {/* TEXT */}
+                  {/* ELEMENT TYPE */}
+
+                  <div className="mt-3 bg-slate-50 rounded-xl p-3 text-sm">
+                    <b>Type:</b>{" "}
+                    {selected.type}
+                    <br />
+                    <b>Side:</b>{" "}
+                    {selected.side}
+                  </div>
+
+                  {/* TEXT CONTROLS */}
 
                   {selected.type ===
                     "text" && (
@@ -1937,8 +2236,7 @@ function CardDesigner() {
                           <input
                             type="color"
                             value={
-                              selected.background &&
-                              selected.background.startsWith(
+                              selected.background?.startsWith(
                                 "#"
                               )
                                 ? selected.background
@@ -2006,130 +2304,143 @@ function CardDesigner() {
                     </div>
                   )}
 
-                  {/* IMAGE */}
+                  {/* IMAGE INFO */}
 
                   {selected.type ===
                     "image" && (
-                    <div className="mt-4">
-                      <p className="text-sm text-slate-500">
-                        Image ಅನ್ನು cardನಲ್ಲಿ drag ಮಾಡಿ ಅಥವಾ ಕೆಳಗಿನ X/Y/Width/Height ಬದಲಿಸಿ.
-                      </p>
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
+
+                      {selected.id ===
+                      "front-qr"
+                        ? "📱 QR Code selected — drag, resize ಅಥವಾ delete ಮಾಡಬಹುದು."
+                        : "🖼️ Image selected — drag, resize ಅಥವಾ delete ಮಾಡಬಹುದು."}
+
                     </div>
                   )}
 
-                  {/* POSITION + SIZE */}
+                  {/* POSITION */}
 
-                  <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="mt-5">
 
-                    <label className="text-sm font-semibold">
-                      X
+                    <h4 className="font-bold mb-3">
+                      Position & Size
+                    </h4>
 
-                      <input
-                        type="number"
-                        value={Math.round(
-                          selected.x
-                        )}
-                        disabled={
-                          locked
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              x: Number(
-                                e.target
-                                  .value
-                              ),
-                            }
-                          )
-                        }
-                        className="w-full border rounded-xl p-3 mt-1"
-                      />
-                    </label>
+                    <div className="grid grid-cols-2 gap-3">
 
-                    <label className="text-sm font-semibold">
-                      Y
+                      <label className="text-sm font-semibold">
+                        X
 
-                      <input
-                        type="number"
-                        value={Math.round(
-                          selected.y
-                        )}
-                        disabled={
-                          locked
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              y: Number(
-                                e.target
-                                  .value
-                              ),
-                            }
-                          )
-                        }
-                        className="w-full border rounded-xl p-3 mt-1"
-                      />
-                    </label>
-
-                    <label className="text-sm font-semibold">
-                      Width
-
-                      <input
-                        type="number"
-                        min="10"
-                        value={Math.round(
-                          selected.width
-                        )}
-                        disabled={
-                          locked
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              width:
-                                Number(
+                        <input
+                          type="number"
+                          value={Math.round(
+                            selected.x
+                          )}
+                          disabled={
+                            locked
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                x: Number(
                                   e.target
                                     .value
                                 ),
-                            }
-                          )
-                        }
-                        className="w-full border rounded-xl p-3 mt-1"
-                      />
-                    </label>
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-3 mt-1"
+                        />
+                      </label>
 
-                    <label className="text-sm font-semibold">
-                      Height
+                      <label className="text-sm font-semibold">
+                        Y
 
-                      <input
-                        type="number"
-                        min="10"
-                        value={Math.round(
-                          selected.height
-                        )}
-                        disabled={
-                          locked
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            selected.id,
-                            {
-                              height:
-                                Number(
+                        <input
+                          type="number"
+                          value={Math.round(
+                            selected.y
+                          )}
+                          disabled={
+                            locked
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                y: Number(
                                   e.target
                                     .value
                                 ),
-                            }
-                          )
-                        }
-                        className="w-full border rounded-xl p-3 mt-1"
-                      />
-                    </label>
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-3 mt-1"
+                        />
+                      </label>
+
+                      <label className="text-sm font-semibold">
+                        Width
+
+                        <input
+                          type="number"
+                          min="10"
+                          value={Math.round(
+                            selected.width
+                          )}
+                          disabled={
+                            locked
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                width:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-3 mt-1"
+                        />
+                      </label>
+
+                      <label className="text-sm font-semibold">
+                        Height
+
+                        <input
+                          type="number"
+                          min="10"
+                          value={Math.round(
+                            selected.height
+                          )}
+                          disabled={
+                            locked
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                height:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-3 mt-1"
+                        />
+                      </label>
+
+                    </div>
 
                   </div>
+
+                  {/* RESET */}
 
                   <button
                     onClick={() =>
@@ -2154,7 +2465,8 @@ function CardDesigner() {
 
               {!selected && (
                 <div className="mt-5 bg-slate-50 rounded-2xl p-5 text-center text-sm text-slate-500">
-                  Cardನಲ್ಲಿ ಯಾವುದಾದರೂ text ಅಥವಾ image ಮೇಲೆ click ಮಾಡಿ edit ಮಾಡಿ.
+                  Cardನಲ್ಲಿ ಯಾವುದೇ text,
+                  image ಅಥವಾ QR ಮೇಲೆ click ಮಾಡಿ edit ಮಾಡಿ.
                 </div>
               )}
 
@@ -2167,48 +2479,71 @@ function CardDesigner() {
                 </h3>
 
                 <p className="text-sm text-green-700 mt-1">
-                  QR scan ಮಾಡಿದಾಗ member Public Page open ಆಗುತ್ತದೆ.
+                  QR Code ಈಗ cardನ normal
+                  draggable element ಆಗಿದೆ.
+                  ಅದರ position, width ಮತ್ತು
+                  height ಬದಲಾಯಿಸಬಹುದು.
                 </p>
 
               </div>
 
             </div>
           </div>
+
         </div>
       </div>
 
       {/* =====================================================
-          HIDDEN PDF RENDER AREA
-
+          PDF RENDER AREA
+          
           IMPORTANT:
-          Preview ಮತ್ತು PDF ಎರಡೂ same elements ಬಳಸುತ್ತವೆ.
-          ===================================================== */}
+          ಇಲ್ಲಿ Front ಮತ್ತು Back ಎರಡೂ
+          CURRENT elements dataನಿಂದಲೇ render ಆಗುತ್ತವೆ.
+          
+          ಆದ್ದರಿಂದ Preview:
+          
+          Front → PDF Page 1
+          Back  → PDF Page 2
+          
+          ಒಂದೇ layout.
+      ===================================================== */}
 
       <div
         style={{
           position: "fixed",
-          left: "-10000px",
-          top: "0px",
 
-          pointerEvents: "none",
+          left: "-10000px",
+
+          top: "0",
+
+          pointerEvents:
+            "none",
 
           zIndex: -1,
 
-          background: "#ffffff",
+          background:
+            "#ffffff",
         }}
       >
 
-        {/* ================= FRONT ================= */}
+        {/* =========================
+            FRONT PDF
+        ========================= */}
 
         <div
           ref={frontPdfRef}
           style={{
-            position: "relative",
+            position:
+              "relative",
 
-            width: displayWidth,
-            height: displayHeight,
+            width:
+              displayWidth,
 
-            overflow: "hidden",
+            height:
+              displayHeight,
+
+            overflow:
+              "hidden",
 
             background:
               "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
@@ -2218,75 +2553,58 @@ function CardDesigner() {
           {elements
             .filter(
               (el) =>
-                el.side === "front"
+                el.side ===
+                "front"
             )
-            .map((element) =>
-              renderElement(
-                element,
-                true
-              )
+            .map(
+              (element) =>
+                renderElement(
+                  element,
+                  true
+                )
             )}
-
-          {/* SAME QR AS PREVIEW */}
-
-          {qr && (
-            <div
-              style={{
-                position: "absolute",
-
-                right: 15,
-                bottom: 15,
-
-                width: 70,
-                height: 70,
-
-                zIndex: 500,
-              }}
-            >
-              <img
-                src={qr}
-                alt="QR"
-                crossOrigin="anonymous"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "block",
-                }}
-              />
-            </div>
-          )}
 
         </div>
 
-        {/* ================= BACK ================= */}
+        {/* =========================
+            BACK PDF
+        ========================= */}
 
         <div
           ref={backPdfRef}
           style={{
-            position: "relative",
+            position:
+              "relative",
 
-            width: displayWidth,
-            height: displayHeight,
+            width:
+              displayWidth,
 
-            overflow: "hidden",
+            height:
+              displayHeight,
+
+            overflow:
+              "hidden",
 
             background:
               "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
 
-            marginTop: 20,
+            marginTop:
+              20,
           }}
         >
 
           {elements
             .filter(
               (el) =>
-                el.side === "back"
+                el.side ===
+                "back"
             )
-            .map((element) =>
-              renderElement(
-                element,
-                true
-              )
+            .map(
+              (element) =>
+                renderElement(
+                  element,
+                  true
+                )
             )}
 
         </div>
