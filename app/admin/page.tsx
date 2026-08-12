@@ -1103,6 +1103,13 @@ export default function Admin() {
               PVC Designer
             </Link>
 
+            <Link
+              href="/admin/bulk-cards"
+              className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg font-semibold"
+            >
+              📥 Bulk PVC Cards
+            </Link>
+
             <button
               onClick={
                 downloadApprovedExcel
