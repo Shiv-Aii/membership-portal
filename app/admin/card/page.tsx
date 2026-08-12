@@ -13,6 +13,8 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useSearchParams } from "next/navigation";
 
+type Side = "front" | "back";
+
 type ElementKey =
   | "photo"
   | "name"
@@ -20,7 +22,11 @@ type ElementKey =
   | "village"
   | "mobile"
   | "memberId"
-  | "qr";
+  | "frontQr"
+  | "backTitle"
+  | "backText"
+  | "backContact"
+  | "backQr";
 
 type CardElement = {
   x: number;
@@ -29,9 +35,14 @@ type CardElement = {
   height: number;
 };
 
-type CardLayout = Record<ElementKey, CardElement>;
+type Layout = Record<ElementKey, CardElement>;
 
-const defaultLayout: CardLayout = {
+const DEFAULT_WIDTH = 85.6;
+const DEFAULT_HEIGHT = 53.9;
+
+const SCALE = 5;
+
+const defaultLayout: Layout = {
   photo: {
     x: 18,
     y: 70,
@@ -43,79 +54,118 @@ const defaultLayout: CardLayout = {
     x: 115,
     y: 72,
     width: 190,
-    height: 25,
+    height: 28,
   },
 
   designation: {
     x: 115,
-    y: 102,
+    y: 105,
     width: 190,
     height: 25,
   },
 
   village: {
     x: 115,
-    y: 132,
+    y: 135,
     width: 190,
     height: 25,
   },
 
   mobile: {
     x: 115,
-    y: 162,
+    y: 165,
     width: 190,
     height: 25,
   },
 
   memberId: {
     x: 115,
-    y: 192,
+    y: 195,
     width: 190,
     height: 25,
   },
 
-  qr: {
+  frontQr: {
     x: 335,
-    y: 165,
+    y: 155,
     width: 65,
     height: 65,
   },
+
+  backTitle: {
+    x: 55,
+    y: 70,
+    width: 320,
+    height: 35,
+  },
+
+  backText: {
+    x: 55,
+    y: 120,
+    width: 320,
+    height: 70,
+  },
+
+  backContact: {
+    x: 55,
+    y: 205,
+    width: 320,
+    height: 30,
+  },
+
+  backQr: {
+    x: 175,
+    y: 225,
+    width: 70,
+    height: 70,
+  },
 };
 
-const labels: Record<ElementKey, string> = {
+const elementLabels: Record<ElementKey, string> = {
   photo: "Photo",
   name: "Name",
   designation: "Designation",
   village: "Village",
   mobile: "Mobile",
   memberId: "Member ID",
-  qr: "QR Code",
+  frontQr: "Front QR",
+  backTitle: "Back Title",
+  backText: "Back Text",
+  backContact: "Back Contact",
+  backQr: "Back QR",
 };
 
 function Card() {
   const params = useSearchParams();
+
   const id = params.get("id");
 
   const [a, setA] = useState<any>(null);
-  const [qr, setQr] = useState("");
-  const [locked, setLocked] = useState(false);
 
-  const [layout, setLayout] =
-    useState<CardLayout>(defaultLayout);
+  const [qr, setQr] = useState("");
+
+  const [locked, setLocked] =
+    useState(false);
+
+  const [side, setSide] =
+    useState<Side>("front");
 
   const [selected, setSelected] =
-    useState<ElementKey>("qr");
+    useState<ElementKey>("frontQr");
 
   const [dragging, setDragging] =
     useState<ElementKey | null>(null);
 
-  const [activeSide, setActiveSide] =
-    useState<"front" | "back">("front");
+  const [width, setWidth] =
+    useState(DEFAULT_WIDTH);
 
-  const front =
+  const [height, setHeight] =
+    useState(DEFAULT_HEIGHT);
+
+  const frontRef =
     useRef<HTMLDivElement>(null);
 
-  const back =
+  const backRef =
     useRef<HTMLDivElement>(null);
 
   const dragStart = useRef({
@@ -124,6 +174,16 @@ function Card() {
     startX: 0,
     startY: 0,
   });
+
+  /*
+   * CURRENT CARD PIXEL SIZE
+   */
+
+  const cardWidth =
+    width * SCALE;
+
+  const cardHeight =
+    height * SCALE;
 
   /*
    * LOAD MEMBER
@@ -151,7 +211,6 @@ function Card() {
 
       /*
        * EXISTING QR URL
-       * DO NOT CHANGE
        */
 
       const publicPageUrl =
@@ -162,7 +221,7 @@ function Card() {
           await QRCode.toDataURL(
             publicPageUrl,
             {
-              width: 300,
+              width: 400,
               margin: 2,
             }
           );
@@ -170,7 +229,7 @@ function Card() {
         setQr(qrImage);
       } catch (error) {
         console.error(
-          "QR generation error:",
+          "QR generation error",
           error
         );
       }
@@ -189,16 +248,30 @@ function Card() {
           const parsed =
             JSON.parse(saved);
 
-          if (parsed) {
+          if (parsed.layout) {
             setLayout({
               ...defaultLayout,
-              ...parsed,
+              ...parsed.layout,
             });
+          }
+
+          if (
+            typeof parsed.width ===
+            "number"
+          ) {
+            setWidth(parsed.width);
+          }
+
+          if (
+            typeof parsed.height ===
+            "number"
+          ) {
+            setHeight(parsed.height);
           }
         }
       } catch (error) {
         console.error(
-          "Design loading error:",
+          "Design loading error",
           error
         );
       }
@@ -207,8 +280,30 @@ function Card() {
     loadMember();
   }, [id]);
 
+  const [layout, setLayout] =
+    useState<Layout>(defaultLayout);
+
   /*
-   * DRAG START
+   * ELEMENT SIDE
+   */
+
+  function elementSide(
+    key: ElementKey
+  ): Side {
+    if (
+      key === "backTitle" ||
+      key === "backText" ||
+      key === "backContact" ||
+      key === "backQr"
+    ) {
+      return "back";
+    }
+
+    return "front";
+  }
+
+  /*
+   * START DRAG
    */
 
   function startDrag(
@@ -221,6 +316,7 @@ function Card() {
     e.stopPropagation();
 
     setSelected(key);
+
     setDragging(key);
 
     dragStart.current = {
@@ -236,7 +332,7 @@ function Card() {
   }
 
   /*
-   * DRAG MOVE
+   * MOVE
    */
 
   function moveElement(
@@ -258,37 +354,28 @@ function Card() {
       e.clientY -
       dragStart.current.mouseY;
 
-    const cardWidth =
-      front.current?.clientWidth || 430;
-
-    const cardHeight =
-      front.current?.clientHeight || 270;
-
     let x =
       dragStart.current.startX + dx;
 
     let y =
       dragStart.current.startY + dy;
 
-    const width =
-      layout[key].width;
-
-    const height =
-      layout[key].height;
+    const item =
+      layout[key];
 
     x = Math.max(
       0,
       Math.min(
         x,
-        cardWidth - width
+        cardWidth - item.width
       )
     );
 
     y = Math.max(
-      48,
+      0,
       Math.min(
         y,
-        cardHeight - height
+        cardHeight - item.height
       )
     );
 
@@ -303,7 +390,7 @@ function Card() {
   }
 
   /*
-   * DRAG STOP
+   * STOP DRAG
    */
 
   function stopDrag(
@@ -322,7 +409,7 @@ function Card() {
    * SIZE
    */
 
-  function changeSize(
+  function changeElementWidth(
     key: ElementKey,
     value: number
   ) {
@@ -333,40 +420,76 @@ function Card() {
       [key]: {
         ...old[key],
         width: value,
-        height:
-          key === "photo" ||
-          key === "qr"
-            ? value
-            : old[key].height,
+      },
+    }));
+  }
+
+  function changeElementHeight(
+    key: ElementKey,
+    value: number
+  ) {
+    if (locked) return;
+
+    setLayout((old) => ({
+      ...old,
+      [key]: {
+        ...old[key],
+        height: value,
       },
     }));
   }
 
   /*
-   * RESET
+   * CARD SIZE
    */
 
-  function resetDesign() {
+  function applyCardSize() {
     if (locked) return;
 
-    setLayout({
-      ...defaultLayout,
-    });
+    if (
+      !width ||
+      !height ||
+      width < 20 ||
+      height < 20
+    ) {
+      alert(
+        "Width ಮತ್ತು Height ಸರಿಯಾದ value ಹಾಕಿ."
+      );
 
-    setSelected("qr");
+      return;
+    }
+
+    setWidth(
+      Number(width.toFixed(1))
+    );
+
+    setHeight(
+      Number(height.toFixed(1))
+    );
+  }
+
+  function standardPVC() {
+    if (locked) return;
+
+    setWidth(85.6);
+    setHeight(53.9);
   }
 
   /*
    * SAVE MASTER
    */
 
-  function saveMasterDesign() {
+  function saveMaster() {
     if (!a?.id) return;
 
     try {
       localStorage.setItem(
         `pvc-master-design-${a.id}`,
-        JSON.stringify(layout)
+        JSON.stringify({
+          width,
+          height,
+          layout,
+        })
       );
 
       alert(
@@ -382,23 +505,38 @@ function Card() {
   }
 
   /*
-   * CAPTURE CARD
+   * RESET
+   */
+
+  function resetDesign() {
+    if (locked) return;
+
+    setWidth(DEFAULT_WIDTH);
+    setHeight(DEFAULT_HEIGHT);
+
+    setLayout({
+      ...defaultLayout,
+    });
+
+    setSelected("frontQr");
+  }
+
+  /*
+   * PDF CAPTURE
    */
 
   async function captureCard(
     element: HTMLDivElement
   ) {
-    return await html2canvas(
-      element,
-      {
-        scale: 3,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: "#ffffff",
-        logging: false,
-        imageTimeout: 15000,
-      }
-    );
+    return html2canvas(element, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 20000,
+      removeContainer: true,
+    });
   }
 
   /*
@@ -407,38 +545,60 @@ function Card() {
 
   async function generatePDF() {
     if (
-      !front.current ||
-      !back.current ||
+      !frontRef.current ||
+      !backRef.current ||
       !a
     ) {
+      alert(
+        "Card preview ಇನ್ನೂ ready ಆಗಿಲ್ಲ."
+      );
+
       return;
     }
 
     try {
+      /*
+       * Wait for browser rendering
+       */
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(resolve, 300)
+      );
+
       const frontCanvas =
         await captureCard(
-          front.current
+          frontRef.current
         );
 
       const backCanvas =
         await captureCard(
-          back.current
+          backRef.current
         );
 
-      const frontImg =
+      const frontImage =
         frontCanvas.toDataURL(
           "image/png"
         );
 
-      const backImg =
+      const backImage =
         backCanvas.toDataURL(
           "image/png"
         );
 
       const pdf = new jsPDF({
-        orientation: "landscape",
+        orientation:
+          width >= height
+            ? "landscape"
+            : "portrait",
+
         unit: "mm",
-        format: [85.6, 53.9],
+
+        format: [
+          width,
+          height,
+        ],
+
         compress: true,
       });
 
@@ -447,12 +607,12 @@ function Card() {
        */
 
       pdf.addImage(
-        frontImg,
+        frontImage,
         "PNG",
         0,
         0,
-        85.6,
-        53.9
+        width,
+        height
       );
 
       /*
@@ -460,17 +620,19 @@ function Card() {
        */
 
       pdf.addPage(
-        [85.6, 53.9],
-        "landscape"
+        [width, height],
+        width >= height
+          ? "landscape"
+          : "portrait"
       );
 
       pdf.addImage(
-        backImg,
+        backImage,
         "PNG",
         0,
         0,
-        85.6,
-        53.9
+        width,
+        height
       );
 
       pdf.save(
@@ -479,47 +641,63 @@ function Card() {
 
     } catch (error) {
       console.error(
-        "PDF ERROR:",
+        "PDF GENERATION ERROR:",
         error
       );
 
       alert(
-        "PDF generation failed. Photo/image CORS ಅಥವಾ browser capture ಸಮಸ್ಯೆ ಇರಬಹುದು."
+        "PDF generation failed. Browser consoleನಲ್ಲಿ PDF GENERATION ERROR ನೋಡಿ."
       );
     }
   }
 
   /*
-   * ELEMENT STYLE
+   * COMMON ELEMENT STYLE
    */
 
-  function elementStyle(
+  function styleFor(
     key: ElementKey
   ) {
     const item =
       layout[key];
 
     return {
+      position: "absolute" as const,
       left: item.x,
       top: item.y,
       width: item.width,
       height: item.height,
       touchAction:
         "none" as const,
+
       zIndex:
         selected === key
-          ? 30
-          : 20,
+          ? 50
+          : 10,
     };
   }
 
   /*
-   * MEMBER LOADING
+   * SELECT ELEMENT
+   */
+
+  function selectElement(
+    key: ElementKey
+  ) {
+    setSelected(key);
+
+    setSide(
+      elementSide(key)
+    );
+  }
+
+  /*
+   * LOADING
    */
 
   if (!a) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-10">
+      <main className="min-h-screen bg-slate-100 grid place-items-center p-10">
 
         <div className="bg-white rounded-2xl shadow p-8 text-center">
 
@@ -537,6 +715,10 @@ function Card() {
     );
   }
 
+  /*
+   * RENDER
+   */
+
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-5">
 
@@ -547,15 +729,13 @@ function Card() {
         <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
 
           <div>
-
             <h1 className="text-2xl font-bold">
               PVC Card Designer
             </h1>
 
             <p className="text-sm text-slate-500 mt-1">
-              Drag & Drop PVC ID Card
+              Front + Back visual designer
             </p>
-
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -572,9 +752,7 @@ function Card() {
             </button>
 
             <button
-              onClick={
-                saveMasterDesign
-              }
+              onClick={saveMaster}
               disabled={locked}
               className="px-4 py-2 rounded-xl bg-purple-600 text-white disabled:opacity-50"
             >
@@ -582,9 +760,7 @@ function Card() {
             </button>
 
             <button
-              onClick={
-                generatePDF
-              }
+              onClick={generatePDF}
               className="px-4 py-2 rounded-xl bg-green-600 text-white"
             >
               📄 Generate PDF
@@ -594,29 +770,625 @@ function Card() {
 
         </div>
 
-        {/* MAIN */}
+        {/* MAIN GRID */}
 
-        <div className="grid xl:grid-cols-[1fr_380px] gap-6 items-start">
+        <div className="grid xl:grid-cols-[1fr_390px] gap-6 items-start">
 
-          {/* LEFT — CARD PREVIEW */}
+          {/* PREVIEW */}
 
-          <div className="min-w-0">
+          <div className="bg-white rounded-3xl shadow p-5">
 
-            <div className="bg-white rounded-3xl shadow p-4 md:p-6">
+            {/* TABS */}
 
-              {/* FRONT / BACK TABS */}
+            <div className="flex gap-2 mb-5">
 
-              <div className="flex gap-2 mb-5">
+              <button
+                onClick={() =>
+                  setSide("front")
+                }
+                className={`px-5 py-2 rounded-xl font-semibold ${
+                  side === "front"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100"
+                }`}
+              >
+                Front
+              </button>
+
+              <button
+                onClick={() =>
+                  setSide("back")
+                }
+                className={`px-5 py-2 rounded-xl font-semibold ${
+                  side === "back"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100"
+                }`}
+              >
+                Back
+              </button>
+
+            </div>
+
+            {/* FRONT */}
+
+            {side === "front" && (
+              <div>
+
+                <p className="font-semibold mb-2">
+                  Front — {width} × {height} mm
+                </p>
+
+                <div className="overflow-x-auto pb-4">
+
+                  <div
+                    ref={frontRef}
+                    className="relative overflow-hidden border rounded-xl bg-white select-none"
+                    style={{
+                      width: cardWidth,
+                      height: cardHeight,
+                      background:
+                        "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
+                    }}
+                  >
+
+                    {/* HEADER */}
+
+                    <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-r from-green-700 to-blue-700 text-white flex items-center justify-center font-bold">
+                      ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
+                    </div>
+
+                    {/* PHOTO */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "photo",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "photo",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "photo"
+                        )
+                      }
+                      style={styleFor(
+                        "photo"
+                      )}
+                      className={`rounded-lg overflow-hidden bg-slate-200 cursor-move ${
+                        selected ===
+                        "photo"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+
+                      {a.photo_url ? (
+                        <img
+                          src={
+                            a.photo_url
+                          }
+                          crossOrigin="anonymous"
+                          className="w-full h-full object-cover pointer-events-none"
+                          alt="Member"
+                        />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-xs text-slate-400">
+                          Photo
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* NAME */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "name",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "name",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "name"
+                        )
+                      }
+                      style={styleFor(
+                        "name"
+                      )}
+                      className={`flex items-center font-bold text-sm cursor-move ${
+                        selected ===
+                        "name"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಹೆಸರು:{" "}
+                      {a.name ||
+                        "-"}
+                    </div>
+
+                    {/* DESIGNATION */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "designation",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "designation",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "designation"
+                        )
+                      }
+                      style={styleFor(
+                        "designation"
+                      )}
+                      className={`flex items-center text-xs cursor-move ${
+                        selected ===
+                        "designation"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಹುದ್ದೆ:{" "}
+                      {a.designation ||
+                        "-"}
+                    </div>
+
+                    {/* VILLAGE */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "village",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "village",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "village"
+                        )
+                      }
+                      style={styleFor(
+                        "village"
+                      )}
+                      className={`flex items-center text-xs cursor-move ${
+                        selected ===
+                        "village"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಗ್ರಾಮ:{" "}
+                      {a.village ||
+                        "-"}
+                    </div>
+
+                    {/* MOBILE */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "mobile",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "mobile",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "mobile"
+                        )
+                      }
+                      style={styleFor(
+                        "mobile"
+                      )}
+                      className={`flex items-center text-xs cursor-move ${
+                        selected ===
+                        "mobile"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಮೊಬೈಲ್:{" "}
+                      {a.mobile ||
+                        "-"}
+                    </div>
+
+                    {/* MEMBER ID */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "memberId",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "memberId",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "memberId"
+                        )
+                      }
+                      style={styleFor(
+                        "memberId"
+                      )}
+                      className={`flex items-center font-semibold text-xs cursor-move ${
+                        selected ===
+                        "memberId"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      Member ID:{" "}
+                      {a.membership_no ||
+                        "-"}
+                    </div>
+
+                    {/* FRONT QR */}
+
+                    {qr && (
+                      <div
+                        onPointerDown={(e) =>
+                          startDrag(
+                            "frontQr",
+                            e
+                          )
+                        }
+                        onPointerMove={(e) =>
+                          moveElement(
+                            "frontQr",
+                            e
+                          )
+                        }
+                        onPointerUp={
+                          stopDrag
+                        }
+                        onPointerCancel={
+                          stopDrag
+                        }
+                        onClick={() =>
+                          selectElement(
+                            "frontQr"
+                          )
+                        }
+                        style={styleFor(
+                          "frontQr"
+                        )}
+                        className={`cursor-move ${
+                          selected ===
+                          "frontQr"
+                            ? "ring-2 ring-blue-500 ring-offset-1"
+                            : ""
+                        }`}
+                      >
+
+                        <img
+                          src={qr}
+                          draggable={
+                            false
+                          }
+                          className="w-full h-full pointer-events-none"
+                          alt="QR"
+                        />
+
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* BACK */}
+
+            {side === "back" && (
+              <div>
+
+                <p className="font-semibold mb-2">
+                  Back — {width} × {height} mm
+                </p>
+
+                <div className="overflow-x-auto pb-4">
+
+                  <div
+                    ref={backRef}
+                    className="relative overflow-hidden border rounded-xl select-none"
+                    style={{
+                      width: cardWidth,
+                      height: cardHeight,
+                      background:
+                        "linear-gradient(135deg,#ffffff,#dbeafe)",
+                    }}
+                  >
+
+                    {/* BACK HEADER */}
+
+                    <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-r from-blue-700 to-green-700 text-white flex items-center justify-center font-bold">
+                      ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ
+                    </div>
+
+                    {/* BACK TITLE */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "backTitle",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "backTitle",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "backTitle"
+                        )
+                      }
+                      style={styleFor(
+                        "backTitle"
+                      )}
+                      className={`flex items-center justify-center text-center font-bold text-xl cursor-move ${
+                        selected ===
+                        "backTitle"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಅಧಿಕೃತ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
+                    </div>
+
+                    {/* BACK TEXT */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "backText",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "backText",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "backText"
+                        )
+                      }
+                      style={styleFor(
+                        "backText"
+                      )}
+                      className={`flex items-center justify-center text-center text-sm text-slate-600 leading-6 cursor-move ${
+                        selected ===
+                        "backText"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      ಈ ಕಾರ್ಡ್ ಸಂಸ್ಥೆಯ ಅಧಿಕೃತ
+                      ಸದಸ್ಯತ್ವದ ಗುರುತಿಗಾಗಿ
+                      ಬಳಸಲಾಗುತ್ತದೆ.
+                    </div>
+
+                    {/* BACK CONTACT */}
+
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(
+                          "backContact",
+                          e
+                        )
+                      }
+                      onPointerMove={(e) =>
+                        moveElement(
+                          "backContact",
+                          e
+                        )
+                      }
+                      onPointerUp={
+                        stopDrag
+                      }
+                      onPointerCancel={
+                        stopDrag
+                      }
+                      onClick={() =>
+                        selectElement(
+                          "backContact"
+                        )
+                      }
+                      style={styleFor(
+                        "backContact"
+                      )}
+                      className={`flex items-center justify-center text-center text-xs text-slate-500 cursor-move ${
+                        selected ===
+                        "backContact"
+                          ? "ring-2 ring-blue-500"
+                          : ""
+                      }`}
+                    >
+                      Scan QR Code to verify
+                      member information
+                    </div>
+
+                    {/* BACK QR */}
+
+                    {qr && (
+                      <div
+                        onPointerDown={(e) =>
+                          startDrag(
+                            "backQr",
+                            e
+                          )
+                        }
+                        onPointerMove={(e) =>
+                          moveElement(
+                            "backQr",
+                            e
+                          )
+                        }
+                        onPointerUp={
+                          stopDrag
+                        }
+                        onPointerCancel={
+                          stopDrag
+                        }
+                        onClick={() =>
+                          selectElement(
+                            "backQr"
+                          )
+                        }
+                        style={styleFor(
+                          "backQr"
+                        )}
+                        className={`cursor-move ${
+                          selected ===
+                          "backQr"
+                            ? "ring-2 ring-blue-500 ring-offset-1"
+                            : ""
+                        }`}
+                      >
+
+                        <img
+                          src={qr}
+                          draggable={
+                            false
+                          }
+                          className="w-full h-full pointer-events-none"
+                          alt="Back QR"
+                        />
+
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+          </div>
+
+          {/* EDIT SECTION */}
+
+          <aside className="bg-white rounded-3xl shadow p-5 xl:h-[calc(100vh-130px)] xl:overflow-y-auto">
+
+            <h2 className="text-xl font-bold">
+              🎨 Edit Section
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              ಈ section ಮಾತ್ರ scroll ಆಗುತ್ತದೆ.
+            </p>
+
+            {/* SIDE */}
+
+            <div className="mt-5">
+
+              <label className="text-sm font-semibold">
+                Card Side
+              </label>
+
+              <div className="grid grid-cols-2 gap-2 mt-2">
 
                 <button
                   onClick={() =>
-                    setActiveSide(
-                      "front"
-                    )
+                    setSide("front")
                   }
-                  className={`px-5 py-2 rounded-xl font-semibold ${
-                    activeSide ===
-                    "front"
+                  className={`p-3 rounded-xl ${
+                    side === "front"
                       ? "bg-blue-600 text-white"
                       : "bg-slate-100"
                   }`}
@@ -626,13 +1398,10 @@ function Card() {
 
                 <button
                   onClick={() =>
-                    setActiveSide(
-                      "back"
-                    )
+                    setSide("back")
                   }
-                  className={`px-5 py-2 rounded-xl font-semibold ${
-                    activeSide ===
-                    "back"
+                  className={`p-3 rounded-xl ${
+                    side === "back"
                       ? "bg-blue-600 text-white"
                       : "bg-slate-100"
                   }`}
@@ -642,496 +1411,130 @@ function Card() {
 
               </div>
 
-              {/* FRONT */}
+            </div>
 
-              {activeSide ===
-                "front" && (
+            {/* CARD SIZE */}
+
+            <div className="mt-6 border rounded-2xl p-4">
+
+              <h3 className="font-bold">
+                📐 Card Size
+              </h3>
+
+              <p className="text-xs text-slate-500 mt-1">
+                Width ಮತ್ತು Height manually ಹಾಕಬಹುದು.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 mt-4">
+
                 <div>
 
-                  <p className="mb-2 font-semibold">
-                    Front — 85.6 × 53.9 mm
-                  </p>
+                  <label className="text-sm font-semibold">
+                    Width (mm)
+                  </label>
 
-                  <div className="w-full overflow-x-auto pb-3">
-
-                    <div
-                      ref={front}
-                      className="relative bg-white border rounded-xl overflow-hidden select-none"
-                      style={{
-                        width: 430,
-                        height: 270,
-                        background:
-                          "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
-                      }}
-                    >
-
-                      {/* HEADER */}
-
-                      <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-r from-green-700 to-blue-700 text-white px-4 flex items-center font-bold">
-                        ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
-                      </div>
-
-                      {/* PHOTO */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "photo",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "photo",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "photo"
-                          )
-                        }
-                        className={`absolute rounded-lg overflow-hidden bg-slate-200 cursor-move ${
-                          selected ===
-                          "photo"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "photo"
-                        )}
-                      >
-
-                        {a.photo_url ? (
-                          <img
-                            src={
-                              a.photo_url
-                            }
-                            crossOrigin="anonymous"
-                            className="w-full h-full object-cover pointer-events-none"
-                            alt="Member"
-                          />
-                        ) : (
-                          <div className="w-full h-full grid place-items-center text-xs text-slate-400">
-                            Photo
-                          </div>
-                        )}
-
-                      </div>
-
-                      {/* NAME */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "name",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "name",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "name"
-                          )
-                        }
-                        className={`absolute flex items-center font-bold text-sm cursor-move ${
-                          selected ===
-                          "name"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "name"
-                        )}
-                      >
-                        ಹೆಸರು:{" "}
-                        {a.name ||
-                          "-"}
-                      </div>
-
-                      {/* DESIGNATION */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "designation",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "designation",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "designation"
-                          )
-                        }
-                        className={`absolute flex items-center text-xs cursor-move ${
-                          selected ===
-                          "designation"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "designation"
-                        )}
-                      >
-                        ಹುದ್ದೆ:{" "}
-                        {a.designation ||
-                          "-"}
-                      </div>
-
-                      {/* VILLAGE */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "village",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "village",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "village"
-                          )
-                        }
-                        className={`absolute flex items-center text-xs cursor-move ${
-                          selected ===
-                          "village"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "village"
-                        )}
-                      >
-                        ಗ್ರಾಮ:{" "}
-                        {a.village ||
-                          "-"}
-                      </div>
-
-                      {/* MOBILE */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "mobile",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "mobile",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "mobile"
-                          )
-                        }
-                        className={`absolute flex items-center text-xs cursor-move ${
-                          selected ===
-                          "mobile"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "mobile"
-                        )}
-                      >
-                        ಮೊಬೈಲ್:{" "}
-                        {a.mobile ||
-                          "-"}
-                      </div>
-
-                      {/* MEMBER ID */}
-
-                      <div
-                        onPointerDown={(e) =>
-                          startDrag(
-                            "memberId",
-                            e
-                          )
-                        }
-                        onPointerMove={(e) =>
-                          moveElement(
-                            "memberId",
-                            e
-                          )
-                        }
-                        onPointerUp={
-                          stopDrag
-                        }
-                        onPointerCancel={
-                          stopDrag
-                        }
-                        onClick={() =>
-                          setSelected(
-                            "memberId"
-                          )
-                        }
-                        className={`absolute flex items-center font-semibold text-xs cursor-move ${
-                          selected ===
-                          "memberId"
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={elementStyle(
-                          "memberId"
-                        )}
-                      >
-                        Member ID:{" "}
-                        {a.membership_no ||
-                          "-"}
-                      </div>
-
-                      {/* QR */}
-
-                      {qr && (
-                        <div
-                          onPointerDown={(e) =>
-                            startDrag(
-                              "qr",
-                              e
-                            )
-                          }
-                          onPointerMove={(e) =>
-                            moveElement(
-                              "qr",
-                              e
-                            )
-                          }
-                          onPointerUp={
-                            stopDrag
-                          }
-                          onPointerCancel={
-                            stopDrag
-                          }
-                          onClick={() =>
-                            setSelected(
-                              "qr"
-                            )
-                          }
-                          className={`absolute cursor-move ${
-                            selected ===
-                            "qr"
-                              ? "ring-2 ring-blue-500 ring-offset-1"
-                              : ""
-                          }`}
-                          style={elementStyle(
-                            "qr"
-                          )}
-                        >
-
-                          <img
-                            src={qr}
-                            draggable={
-                              false
-                            }
-                            className="w-full h-full pointer-events-none"
-                            alt="Public Page QR Code"
-                          />
-
-                        </div>
-                      )}
-
-                    </div>
-
-                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="20"
+                    max="300"
+                    value={width}
+                    disabled={locked}
+                    onChange={(e) =>
+                      setWidth(
+                        Number(
+                          e.target.value
+                        )
+                      )
+                    }
+                    className="border rounded-xl p-3 w-full mt-2"
+                  />
 
                 </div>
-              )}
 
-              {/* BACK */}
-
-              {activeSide ===
-                "back" && (
                 <div>
 
-                  <p className="mb-2 font-semibold">
-                    Back — 85.6 × 53.9 mm
-                  </p>
+                  <label className="text-sm font-semibold">
+                    Height (mm)
+                  </label>
 
-                  <div className="w-full overflow-x-auto pb-3">
-
-                    <div
-                      ref={back}
-                      className="relative overflow-hidden rounded-xl border bg-white"
-                      style={{
-                        width: 430,
-                        height: 270,
-                        background:
-                          "linear-gradient(135deg,#f8fafc,#dbeafe)",
-                      }}
-                    >
-
-                      {/* BACK HEADER */}
-
-                      <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-r from-blue-700 to-green-700 text-white flex items-center justify-center font-bold">
-                        ನಮ್ಮ ಸಂಘಟನೆ — ನಮ್ಮ ಬಲ
-                      </div>
-
-                      {/* BACK CONTENT */}
-
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 pt-8">
-
-                        <div className="text-xl font-bold text-slate-800">
-                          ಅಧಿಕೃತ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
-                        </div>
-
-                        <p className="text-sm text-slate-600 mt-4 leading-6">
-                          ಈ ಕಾರ್ಡ್ ಸಂಸ್ಥೆಯ ಅಧಿಕೃತ
-                          ಸದಸ್ಯತ್ವದ ಗುರುತಿಗಾಗಿ
-                          ಬಳಸಲಾಗುತ್ತದೆ.
-                        </p>
-
-                        <div className="mt-5 border-t w-3/4 pt-3">
-
-                          <p className="text-xs text-slate-500">
-                            Scan QR Code to verify
-                            member information
-                          </p>
-
-                          <p className="text-xs text-slate-500 mt-1">
-                            Official Membership Card
-                          </p>
-
-                        </div>
-
-                        <div className="absolute bottom-4 text-[9px] text-slate-400">
-                          PVC Membership Card
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="20"
+                    max="300"
+                    value={height}
+                    disabled={locked}
+                    onChange={(e) =>
+                      setHeight(
+                        Number(
+                          e.target.value
+                        )
+                      )
+                    }
+                    className="border rounded-xl p-3 w-full mt-2"
+                  />
 
                 </div>
-              )}
+
+              </div>
+
+              <button
+                onClick={
+                  standardPVC
+                }
+                disabled={locked}
+                className="w-full border rounded-xl p-3 mt-3"
+              >
+                Standard PVC
+                <br />
+                <span className="text-xs text-slate-500">
+                  85.6 × 53.9 mm
+                </span>
+              </button>
+
+              <button
+                onClick={
+                  applyCardSize
+                }
+                disabled={locked}
+                className="w-full bg-blue-600 text-white rounded-xl p-3 mt-3 disabled:opacity-50"
+              >
+                Apply Card Size
+              </button>
 
             </div>
 
-          </div>
-
-          {/* RIGHT — EDIT SECTION ONLY SCROLL */}
-
-          <div className="bg-white rounded-3xl shadow p-5 xl:h-[calc(100vh-130px)] xl:overflow-y-auto">
-
-            <h2 className="font-bold text-xl">
-              🎨 Edit Section
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              ಇಲ್ಲಿ ಮಾತ್ರ scroll ಆಗುತ್ತದೆ.
-            </p>
-
             {/* ELEMENTS */}
 
-            <div className="mt-5">
+            <div className="mt-6">
 
-              <h3 className="font-semibold mb-2">
+              <h3 className="font-bold">
                 Elements
               </h3>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mt-3">
 
                 {(Object.keys(
-                  labels
+                  elementLabels
                 ) as ElementKey[]).map(
                   (key) => (
 
                     <button
                       key={key}
                       onClick={() =>
-                        setSelected(
+                        selectElement(
                           key
                         )
                       }
-                      className={`border rounded-xl px-3 py-3 text-left ${
+                      className={`border rounded-xl p-3 text-left ${
                         selected ===
                         key
                           ? "border-blue-500 bg-blue-50"
-                          : "border-slate-200"
+                          : ""
                       }`}
                     >
-
-                      {key ===
-                        "photo" &&
-                        "🖼️ "}
-
-                      {key ===
-                        "name" &&
-                        "👤 "}
-
-                      {key ===
-                        "designation" &&
-                        "💼 "}
-
-                      {key ===
-                        "village" &&
-                        "🏠 "}
-
-                      {key ===
-                        "mobile" &&
-                        "📱 "}
-
-                      {key ===
-                        "memberId" &&
-                        "🆔 "}
-
-                      {key ===
-                        "qr" &&
-                        "🔳 "}
-
-                      {labels[key]}
-
+                      {elementLabels[key]}
                     </button>
 
                   )
@@ -1141,135 +1544,89 @@ function Card() {
 
             </div>
 
-            {/* SELECTED ELEMENT */}
+            {/* ELEMENT SIZE */}
 
             <div className="mt-6 border rounded-2xl p-4">
 
               <h3 className="font-bold">
-                Selected:{" "}
-                {labels[selected]}
+                Selected Element
               </h3>
 
-              <div className="mt-4">
+              <p className="text-sm text-blue-600 mt-1">
+                {elementLabels[selected]}
+              </p>
 
-                <div className="flex justify-between text-sm mb-2">
+              <div className="grid grid-cols-2 gap-3 mt-4">
 
-                  <span>
-                    Width / Size
-                  </span>
+                <div>
 
-                  <b>
-                    {Math.round(
+                  <label className="text-xs text-slate-500">
+                    Width (px)
+                  </label>
+
+                  <input
+                    type="number"
+                    value={Math.round(
                       layout[
                         selected
                       ].width
                     )}
-                    px
-                  </b>
-
-                </div>
-
-                <input
-                  type="range"
-                  min="30"
-                  max="180"
-                  value={
-                    layout[
-                      selected
-                    ].width
-                  }
-                  disabled={locked}
-                  onChange={(e) =>
-                    changeSize(
-                      selected,
-                      Number(
-                        e.target.value
+                    disabled={locked}
+                    onChange={(e) =>
+                      changeElementWidth(
+                        selected,
+                        Number(
+                          e.target.value
+                        )
                       )
-                    )
-                  }
-                  className="w-full"
-                />
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mt-4">
-
-                <div className="border rounded-xl p-3">
-
-                  <div className="text-xs text-slate-500">
-                    X Position
-                  </div>
-
-                  <div className="font-bold">
-                    {Math.round(
-                      layout[
-                        selected
-                      ].x
-                    )}
-                    px
-                  </div>
+                    }
+                    className="border rounded-xl p-3 w-full mt-1"
+                  />
 
                 </div>
 
-                <div className="border rounded-xl p-3">
+                <div>
 
-                  <div className="text-xs text-slate-500">
-                    Y Position
-                  </div>
+                  <label className="text-xs text-slate-500">
+                    Height (px)
+                  </label>
 
-                  <div className="font-bold">
-                    {Math.round(
+                  <input
+                    type="number"
+                    value={Math.round(
                       layout[
                         selected
-                      ].y
+                      ].height
                     )}
-                    px
-                  </div>
+                    disabled={locked}
+                    onChange={(e) =>
+                      changeElementHeight(
+                        selected,
+                        Number(
+                          e.target.value
+                        )
+                      )
+                    }
+                    className="border rounded-xl p-3 w-full mt-1"
+                  />
 
                 </div>
 
               </div>
 
-            </div>
-
-            {/* CARD TITLE */}
-
-            <div className="mt-5">
-
-              <label className="text-sm font-semibold">
-                Card Title
-              </label>
-
-              <input
-                defaultValue="ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್"
-                disabled={locked}
-                className="border rounded-xl p-3 w-full mt-2"
-              />
-
-            </div>
-
-            {/* SIZE */}
-
-            <div className="mt-5">
-
-              <label className="text-sm font-semibold">
-                Card Size
-              </label>
-
-              <select
-                disabled={locked}
-                className="border rounded-xl p-3 w-full mt-2"
-              >
-
-                <option>
-                  85.6 × 53.9 mm — Standard PVC
-                </option>
-
-                <option>
-                  Custom Size
-                </option>
-
-              </select>
+              <div className="mt-4 text-xs text-slate-500">
+                X:{" "}
+                {Math.round(
+                  layout[selected].x
+                )}{" "}
+                px
+                {" • "}
+                Y:{" "}
+                {Math.round(
+                  layout[selected].y
+                )}{" "}
+                px
+              </div>
 
             </div>
 
@@ -1279,7 +1636,7 @@ function Card() {
 
               <button
                 onClick={
-                  saveMasterDesign
+                  saveMaster
                 }
                 disabled={locked}
                 className="bg-purple-600 text-white rounded-xl p-3 disabled:opacity-50"
@@ -1313,56 +1670,20 @@ function Card() {
             <div className="mt-6 bg-green-50 border border-green-200 rounded-2xl p-4">
 
               <h3 className="font-bold text-green-800">
-
                 {locked
                   ? "🔒 Design Locked"
                   : "✏️ Editing Enabled"}
-
               </h3>
 
               <p className="text-sm text-green-700 mt-1">
-
                 {locked
-                  ? "Design locked. Unlock ಮಾಡಿ ಮತ್ತೆ edit ಮಾಡಬಹುದು."
-                  : "Card previewನಲ್ಲಿ element select ಮಾಡಿ drag ಮಾಡಬಹುದು."}
-
+                  ? "Unlock ಮಾಡಿ ಮತ್ತೆ edit ಮಾಡಬಹುದು."
+                  : "Front ಮತ್ತು Back ಎರಡರ elements drag ಮಾಡಬಹುದು."}
               </p>
 
             </div>
 
-            {/* QR INFO */}
-
-            <div className="mt-5 bg-blue-50 border border-blue-200 rounded-2xl p-4">
-
-              <h3 className="font-bold text-blue-800">
-                🔳 QR Code
-              </h3>
-
-              <p className="text-sm text-blue-700 mt-1">
-                QR Code ಈಗಿರುವ Public Page URL
-               ನ್ನೇ ಬಳಸುತ್ತದೆ. QR ಅನ್ನು cardನಲ್ಲಿ
-                drag ಮಾಡಿ ಬೇಕಾದ positionಗೆ ಇಡಬಹುದು.
-              </p>
-
-            </div>
-
-            {/* PDF INFO */}
-
-            <div className="mt-5 bg-slate-50 border rounded-2xl p-4">
-
-              <h3 className="font-bold">
-                📄 PDF Output
-              </h3>
-
-              <p className="text-sm text-slate-600 mt-1">
-                PDFನಲ್ಲಿ ಮೊದಲು Front card,
-                ನಂತರ Back card ಎರಡು pages ಆಗಿ
-                generate ಆಗುತ್ತದೆ.
-              </p>
-
-            </div>
-
-          </div>
+          </aside>
 
         </div>
 
