@@ -1,6 +1,10 @@
  "use client";
 
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -18,7 +22,7 @@ type Member = {
   is_deleted?: boolean;
 };
 
-export default function VerifyMemberPage() {
+function VerifyMemberContent() {
   const searchParams = useSearchParams();
 
   const [membershipNo, setMembershipNo] =
@@ -117,12 +121,12 @@ export default function VerifyMemberPage() {
   }
 
   /*
-   * QR scan ಮಾಡಿದಾಗ:
+   * QR scan:
    *
    * /verify?membership=10
    *
-   * URLನ membership number automatic ಆಗಿ ತೆಗೆದುಕೊಂಡು
-   * member verification ಮಾಡುತ್ತದೆ.
+   * URLನ membership number automatic ಆಗಿ
+   * ತೆಗೆದುಕೊಂಡು verification ಮಾಡುತ್ತದೆ.
    */
   useEffect(() => {
     const number =
@@ -131,13 +135,8 @@ export default function VerifyMemberPage() {
       );
 
     if (number) {
-      setMembershipNo(
-        number
-      );
-
-      verifyMember(
-        number
-      );
+      setMembershipNo(number);
+      verifyMember(number);
     }
   }, [searchParams]);
 
@@ -199,9 +198,7 @@ export default function VerifyMemberPage() {
             <input
               type="text"
               inputMode="numeric"
-              value={
-                membershipNo
-              }
+              value={membershipNo}
               onChange={(e) =>
                 setMembershipNo(
                   e.target.value
@@ -218,9 +215,7 @@ export default function VerifyMemberPage() {
               onClick={() =>
                 verifyMember()
               }
-              disabled={
-                loading
-              }
+              disabled={loading}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold"
             >
               {loading
@@ -236,11 +231,9 @@ export default function VerifyMemberPage() {
             <div className="mt-4 text-center text-sm text-blue-600">
               QR Verification Number:{" "}
               <b>
-                {
-                  searchParams.get(
-                    "membership"
-                  )
-                }
+                {searchParams.get(
+                  "membership"
+                )}
               </b>
             </div>
           )}
@@ -411,5 +404,31 @@ function Info({
       </div>
 
     </div>
+  );
+}
+
+/*
+ * Next.jsನಲ್ಲಿ useSearchParams() ಬಳಸುವ pageಗೆ
+ * Suspense boundary ಕೊಟ್ಟರೆ deployment/build ಸಮಯದ
+ * prerender error ತಪ್ಪುತ್ತದೆ.
+ */
+export default function VerifyMemberPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-sm px-6 py-5 text-center">
+            <div className="text-lg font-bold">
+              Loading Verification...
+            </div>
+            <div className="text-sm text-slate-500 mt-1">
+              Please wait...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <VerifyMemberContent />
+    </Suspense>
   );
 }
