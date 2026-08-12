@@ -49,7 +49,11 @@ export default async function Home() {
               {sub}
             </p>
 
+            {/* BUTTONS */}
+
             <div className="flex flex-wrap gap-3 mt-8">
+
+              {/* REGISTER */}
 
               <Link
                 href="/register"
@@ -57,6 +61,17 @@ export default async function Home() {
               >
                 ಸದಸ್ಯತ್ವ ನೋಂದಣಿ →
               </Link>
+
+              {/* VERIFY */}
+
+              <Link
+                href="/verify"
+                className="inline-block bg-slate-950 text-white font-bold px-7 py-3 rounded-xl shadow-lg hover:bg-slate-900 hover:scale-[1.02] transition"
+              >
+                🔎 Verify Membership
+              </Link>
+
+              {/* HOW IT WORKS */}
 
               <a
                 href="#how-it-works"
@@ -68,6 +83,41 @@ export default async function Home() {
             </div>
 
           </div>
+        </section>
+
+        {/* VERIFY MEMBERSHIP SECTION */}
+
+        <section className="max-w-6xl mx-auto px-4 pt-12">
+
+          <div
+            className="bg-white rounded-3xl p-8 md:p-10 border border-slate-100 card-shadow text-center"
+          >
+
+            <div className="text-5xl">
+              🔎
+            </div>
+
+            <h2 className="text-2xl md:text-3xl font-extrabold mt-4">
+              ನಿಮ್ಮ Membership Verify ಮಾಡಿ
+            </h2>
+
+            <p className="text-slate-500 mt-3 max-w-2xl mx-auto">
+              ನಿಮ್ಮ Membership Number ಬಳಸಿ ನಿಮ್ಮ membership
+              approved ಮತ್ತು active ಆಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.
+            </p>
+
+            <Link
+              href="/verify"
+              style={{
+                backgroundColor: brand,
+              }}
+              className="inline-block mt-6 text-white font-bold px-8 py-3 rounded-xl shadow hover:opacity-90 transition"
+            >
+              🔎 Verify Membership →
+            </Link>
+
+          </div>
+
         </section>
 
         {/* HOW IT WORKS */}
@@ -163,12 +213,23 @@ export default async function Home() {
               ನಿಮ್ಮ ವಿವರ ಸಲ್ಲಿಸಿ ಮತ್ತು Admin approval ಪಡೆಯಿರಿ.
             </p>
 
-            <Link
-              href="/register"
-              className="inline-block mt-6 bg-white text-slate-900 font-bold px-7 py-3 rounded-xl"
-            >
-              Register Now →
-            </Link>
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
+
+              <Link
+                href="/register"
+                className="bg-white text-slate-900 font-bold px-7 py-3 rounded-xl"
+              >
+                Register Now →
+              </Link>
+
+              <Link
+                href="/verify"
+                className="bg-slate-950 text-white font-bold px-7 py-3 rounded-xl"
+              >
+                🔎 Verify Member
+              </Link>
+
+            </div>
 
           </div>
 
