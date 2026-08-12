@@ -13,10 +13,83 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useSearchParams } from "next/navigation";
 
-type QRPosition = {
+type ElementKey =
+  | "photo"
+  | "name"
+  | "designation"
+  | "village"
+  | "mobile"
+  | "memberId"
+  | "qr";
+
+type CardElement = {
   x: number;
   y: number;
-  size: number;
+  width: number;
+  height: number;
+};
+
+type CardLayout = Record<ElementKey, CardElement>;
+
+const defaultLayout: CardLayout = {
+  photo: {
+    x: 18,
+    y: 70,
+    width: 80,
+    height: 95,
+  },
+
+  name: {
+    x: 115,
+    y: 72,
+    width: 150,
+    height: 28,
+  },
+
+  designation: {
+    x: 115,
+    y: 103,
+    width: 150,
+    height: 24,
+  },
+
+  village: {
+    x: 115,
+    y: 130,
+    width: 150,
+    height: 24,
+  },
+
+  mobile: {
+    x: 115,
+    y: 157,
+    width: 150,
+    height: 24,
+  },
+
+  memberId: {
+    x: 115,
+    y: 184,
+    width: 150,
+    height: 26,
+  },
+
+  qr: {
+    x: 315,
+    y: 155,
+    width: 70,
+    height: 70,
+  },
+};
+
+const labels: Record<ElementKey, string> = {
+  photo: "Photo",
+  name: "Name",
+  designation: "Designation",
+  village: "Village",
+  mobile: "Mobile",
+  memberId: "Member ID",
+  qr: "QR Code",
 };
 
 function Card() {
@@ -27,15 +100,14 @@ function Card() {
   const [qr, setQr] = useState("");
   const [locked, setLocked] = useState(false);
 
-  const [qrPosition, setQrPosition] =
-    useState<QRPosition>({
-      x: 0,
-      y: 0,
-      size: 64,
-    });
+  const [layout, setLayout] =
+    useState<CardLayout>(defaultLayout);
 
-  const [draggingQR, setDraggingQR] =
-    useState(false);
+  const [selected, setSelected] =
+    useState<ElementKey>("qr");
+
+  const [dragging, setDragging] =
+    useState<ElementKey | null>(null);
 
   const front =
     useRef<HTMLDivElement>(null);
@@ -46,6 +118,10 @@ function Card() {
     startX: 0,
     startY: 0,
   });
+
+  /*
+   * LOAD MEMBER
+   */
 
   useEffect(() => {
     async function loadMember() {
@@ -80,27 +156,30 @@ function Card() {
 
         setQr(qrImage);
 
+        /*
+         * LOAD SAVED DESIGN
+         */
+
         try {
           const saved =
             localStorage.getItem(
-              `pvc-qr-position-${data.id}`
+              `pvc-master-design-${data.id}`
             );
 
           if (saved) {
             const parsed =
               JSON.parse(saved);
 
-            if (
-              typeof parsed.x === "number" &&
-              typeof parsed.y === "number" &&
-              typeof parsed.size === "number"
-            ) {
-              setQrPosition(parsed);
+            if (parsed) {
+              setLayout({
+                ...defaultLayout,
+                ...parsed,
+              });
             }
           }
         } catch (error) {
           console.error(
-            "QR position loading error:",
+            "Design loading error:",
             error
           );
         }
@@ -110,16 +189,12 @@ function Card() {
     loadMember();
   }, [id]);
 
-  useEffect(() => {
-    if (!a?.id) return;
+  /*
+   * START DRAG
+   */
 
-    localStorage.setItem(
-      `pvc-qr-position-${a.id}`,
-      JSON.stringify(qrPosition)
-    );
-  }, [qrPosition, a?.id]);
-
-  function startQRDrag(
+  function startDrag(
+    key: ElementKey,
     e: React.PointerEvent<HTMLDivElement>
   ) {
     if (locked) return;
@@ -127,13 +202,14 @@ function Card() {
     e.preventDefault();
     e.stopPropagation();
 
-    setDraggingQR(true);
+    setSelected(key);
+    setDragging(key);
 
     dragStart.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
-      startX: qrPosition.x,
-      startY: qrPosition.y,
+      startX: layout[key].x,
+      startY: layout[key].y,
     };
 
     e.currentTarget.setPointerCapture(
@@ -141,10 +217,20 @@ function Card() {
     );
   }
 
-  function moveQR(
+  /*
+   * MOVE ELEMENT
+   */
+
+  function moveElement(
+    key: ElementKey,
     e: React.PointerEvent<HTMLDivElement>
   ) {
-    if (!draggingQR || locked) return;
+    if (
+      locked ||
+      dragging !== key
+    ) {
+      return;
+    }
 
     const dx =
       e.clientX -
@@ -154,53 +240,58 @@ function Card() {
       e.clientY -
       dragStart.current.mouseY;
 
-    let newX =
-      dragStart.current.startX + dx;
-
-    let newY =
-      dragStart.current.startY + dy;
-
     const cardWidth =
-      front.current?.clientWidth || 400;
+      front.current?.clientWidth || 430;
 
     const cardHeight =
-      front.current?.clientHeight || 250;
+      front.current?.clientHeight || 270;
 
-    const maxX =
-      Math.max(
-        0,
-        cardWidth - qrPosition.size
-      );
+    let x =
+      dragStart.current.startX + dx;
 
-    const maxY =
-      Math.max(
-        0,
-        cardHeight - qrPosition.size
-      );
+    let y =
+      dragStart.current.startY + dy;
 
-    newX = Math.max(
+    const width =
+      layout[key].width;
+
+    const height =
+      layout[key].height;
+
+    x = Math.max(
       0,
-      Math.min(newX, maxX)
+      Math.min(
+        x,
+        cardWidth - width
+      )
     );
 
-    newY = Math.max(
+    y = Math.max(
       0,
-      Math.min(newY, maxY)
+      Math.min(
+        y,
+        cardHeight - height
+      )
     );
 
-    setQrPosition((old) => ({
+    setLayout((old) => ({
       ...old,
-      x: newX,
-      y: newY,
+      [key]: {
+        ...old[key],
+        x,
+        y,
+      },
     }));
   }
 
-  function stopQRDrag(
+  /*
+   * STOP DRAG
+   */
+
+  function stopDrag(
     e: React.PointerEvent<HTMLDivElement>
   ) {
-    if (!draggingQR) return;
-
-    setDraggingQR(false);
+    setDragging(null);
 
     try {
       e.currentTarget.releasePointerCapture(
@@ -209,63 +300,112 @@ function Card() {
     } catch {}
   }
 
-  function resetQRPosition() {
-    if (locked) return;
+  /*
+   * CHANGE SIZE
+   */
 
-    setQrPosition({
-      x: 0,
-      y: 0,
-      size: 64,
-    });
-  }
-
-  function changeQRSize(
+  function changeSize(
+    key: ElementKey,
     value: number
   ) {
     if (locked) return;
 
-    setQrPosition((old) => ({
+    setLayout((old) => ({
       ...old,
-      size: value,
+      [key]: {
+        ...old[key],
+        width: value,
+        height:
+          key === "photo" ||
+          key === "qr"
+            ? value
+            : old[key].height,
+      },
     }));
   }
+
+  /*
+   * RESET
+   */
+
+  function resetDesign() {
+    if (locked) return;
+
+    setLayout({
+      ...defaultLayout,
+    });
+
+    setSelected("qr");
+  }
+
+  /*
+   * SAVE MASTER DESIGN
+   */
+
+  function saveMasterDesign() {
+    if (!a?.id) return;
+
+    localStorage.setItem(
+      `pvc-master-design-${a.id}`,
+      JSON.stringify(layout)
+    );
+
+    alert(
+      "Master Design saved successfully."
+    );
+  }
+
+  /*
+   * GENERATE PDF
+   */
 
   async function generatePDF() {
     if (!front.current || !a)
       return;
 
-    const canvas =
-      await html2canvas(
-        front.current,
-        {
-          scale: 4,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-        }
+    try {
+      const canvas =
+        await html2canvas(
+          front.current,
+          {
+            scale: 4,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+          }
+        );
+
+      const img =
+        canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [85.6, 53.9],
+      });
+
+      pdf.addImage(
+        img,
+        "PNG",
+        0,
+        0,
+        85.6,
+        53.9
       );
 
-    const img =
-      canvas.toDataURL("image/png");
-
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: [85.6, 53.9],
-    });
-
-    pdf.addImage(
-      img,
-      "PNG",
-      0,
-      0,
-      85.6,
-      53.9
-    );
-
-    pdf.save(
-      `${a.membership_no || "member"}-PVC.pdf`
-    );
+      pdf.save(
+        `${a.membership_no || "member"}-PVC.pdf`
+      );
+    } catch (error) {
+      console.error(error);
+      alert(
+        "PDF generation failed."
+      );
+    }
   }
+
+  /*
+   * LOADING
+   */
 
   if (!a) {
     return (
@@ -283,18 +423,46 @@ function Card() {
     );
   }
 
+  /*
+   * ELEMENT COMPONENT
+   */
+
+  function elementStyle(
+    key: ElementKey
+  ) {
+    const item = layout[key];
+
+    return {
+      left: item.x,
+      top: item.y,
+      width: item.width,
+      height: item.height,
+      touchAction: "none" as const,
+      zIndex:
+        selected === key ? 30 : 20,
+    };
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 p-5">
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
+
+        {/* HEADER */}
 
         <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
 
-          <h1 className="text-2xl font-bold">
-            PVC Card Designer
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold">
+              PVC Card Designer
+            </h1>
 
-          <div className="flex gap-2">
+            <p className="text-sm text-slate-500 mt-1">
+              Drag elements and design your PVC card.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
 
             <button
               onClick={() =>
@@ -303,22 +471,32 @@ function Card() {
               className="px-4 py-2 rounded-xl bg-slate-900 text-white"
             >
               {locked
-                ? "Unlock Design"
-                : "Lock Design"}
+                ? "🔓 Unlock Design"
+                : "🔒 Lock Design"}
+            </button>
+
+            <button
+              onClick={saveMasterDesign}
+              disabled={locked}
+              className="px-4 py-2 rounded-xl bg-purple-600 text-white disabled:opacity-50"
+            >
+              💾 Save Master
             </button>
 
             <button
               onClick={generatePDF}
               className="px-4 py-2 rounded-xl bg-green-600 text-white"
             >
-              Generate PDF
+              📄 Generate PDF
             </button>
 
           </div>
 
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid xl:grid-cols-[1fr_360px] gap-6">
+
+          {/* CARD AREA */}
 
           <div>
 
@@ -326,29 +504,60 @@ function Card() {
               Front — 85.6 × 53.9 mm
             </p>
 
-            <div
-              ref={front}
-              className="pvc bg-white rounded-xl overflow-hidden border relative select-none"
-              style={{
-                background:
-                  "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
-                minHeight: "250px",
-              }}
-            >
+            <div className="bg-white rounded-3xl shadow p-5 overflow-auto">
 
-              <div className="h-12 bg-gradient-to-r from-green-700 to-blue-700 text-white px-4 flex items-center font-bold">
-                ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
-              </div>
+              <div
+                ref={front}
+                className="relative bg-white border rounded-xl overflow-hidden select-none"
+                style={{
+                  width: 430,
+                  height: 270,
+                  background:
+                    "linear-gradient(135deg,#ffffff 35%,#dcfce7)",
+                }}
+              >
 
-              <div className="p-4 flex gap-4">
+                {/* HEADER */}
 
-                <div className="w-20 h-24 rounded-lg overflow-hidden bg-slate-200 flex-shrink-0">
+                <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-r from-green-700 to-blue-700 text-white px-4 flex items-center font-bold">
+                  ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್
+                </div>
+
+                {/* PHOTO */}
+
+                <div
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "photo",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "photo",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected("photo")
+                  }
+                  className={`absolute rounded-lg overflow-hidden bg-slate-200 cursor-move ${
+                    selected === "photo"
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
+                  style={elementStyle(
+                    "photo"
+                  )}
+                >
 
                   {a.photo_url ? (
                     <img
                       src={a.photo_url}
                       crossOrigin="anonymous"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover pointer-events-none"
                       alt="Member"
                     />
                   ) : (
@@ -359,168 +568,327 @@ function Card() {
 
                 </div>
 
-                <div className="text-xs leading-5">
+                {/* NAME */}
 
-                  <div>
-                    <b>ಹೆಸರು:</b>{" "}
-                    {a.name || "-"}
-                  </div>
-
-                  <div>
-                    <b>ಹುದ್ದೆ:</b>{" "}
-                    {a.designation || "-"}
-                  </div>
-
-                  <div>
-                    <b>ಗ್ರಾಮ:</b>{" "}
-                    {a.village || "-"}
-                  </div>
-
-                  <div>
-                    <b>ಮೊಬೈಲ್:</b>{" "}
-                    {a.mobile || "-"}
-                  </div>
-
-                  <div>
-                    <b>Member ID:</b>{" "}
-                    {a.membership_no || "-"}
-                  </div>
-
+                <div
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "name",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "name",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected("name")
+                  }
+                  className={`absolute flex items-center font-bold text-sm cursor-move ${
+                    selected === "name"
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
+                  style={elementStyle(
+                    "name"
+                  )}
+                >
+                  ಹೆಸರು:{" "}
+                  {a.name || "-"}
                 </div>
 
-              </div>
+                {/* DESIGNATION */}
 
-              {qr && (
                 <div
-                  onPointerDown={startQRDrag}
-                  onPointerMove={moveQR}
-                  onPointerUp={stopQRDrag}
-                  onPointerCancel={stopQRDrag}
-                  className={`absolute ${
-                    locked
-                      ? "cursor-default"
-                      : "cursor-move"
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "designation",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "designation",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected(
+                      "designation"
+                    )
+                  }
+                  className={`absolute flex items-center text-xs cursor-move ${
+                    selected === "designation"
+                      ? "ring-2 ring-blue-500"
+                      : ""
                   }`}
-                  style={{
-                    left: qrPosition.x,
-                    top: qrPosition.y,
-                    width: qrPosition.size,
-                    height:
-                      qrPosition.size + 18,
-                    touchAction: "none",
-                    zIndex: 20,
-                  }}
+                  style={elementStyle(
+                    "designation"
+                  )}
                 >
+                  ಹುದ್ದೆ:{" "}
+                  {a.designation || "-"}
+                </div>
 
+                {/* VILLAGE */}
+
+                <div
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "village",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "village",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected("village")
+                  }
+                  className={`absolute flex items-center text-xs cursor-move ${
+                    selected === "village"
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
+                  style={elementStyle(
+                    "village"
+                  )}
+                >
+                  ಗ್ರಾಮ:{" "}
+                  {a.village || "-"}
+                </div>
+
+                {/* MOBILE */}
+
+                <div
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "mobile",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "mobile",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected("mobile")
+                  }
+                  className={`absolute flex items-center text-xs cursor-move ${
+                    selected === "mobile"
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
+                  style={elementStyle(
+                    "mobile"
+                  )}
+                >
+                  ಮೊಬೈಲ್:{" "}
+                  {a.mobile || "-"}
+                </div>
+
+                {/* MEMBER ID */}
+
+                <div
+                  onPointerDown={(e) =>
+                    startDrag(
+                      "memberId",
+                      e
+                    )
+                  }
+                  onPointerMove={(e) =>
+                    moveElement(
+                      "memberId",
+                      e
+                    )
+                  }
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onClick={() =>
+                    setSelected("memberId")
+                  }
+                  className={`absolute flex items-center font-semibold text-xs cursor-move ${
+                    selected === "memberId"
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
+                  style={elementStyle(
+                    "memberId"
+                  )}
+                >
+                  Member ID:{" "}
+                  {a.membership_no ||
+                    "-"}
+                </div>
+
+                {/* QR */}
+
+                {qr && (
                   <div
-                    className={`rounded ${
-                      !locked
+                    onPointerDown={(e) =>
+                      startDrag(
+                        "qr",
+                        e
+                      )
+                    }
+                    onPointerMove={(e) =>
+                      moveElement(
+                        "qr",
+                        e
+                      )
+                    }
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    onClick={() =>
+                      setSelected("qr")
+                    }
+                    className={`absolute cursor-move ${
+                      selected === "qr"
                         ? "ring-2 ring-blue-500 ring-offset-1"
                         : ""
                     }`}
-                    style={{
-                      width:
-                        qrPosition.size,
-                      height:
-                        qrPosition.size,
-                    }}
+                    style={elementStyle(
+                      "qr"
+                    )}
                   >
-
                     <img
                       src={qr}
                       draggable={false}
-                      className="w-full h-full"
-                      alt="Public Page QR Code"
+                      className="w-full h-full pointer-events-none"
+                      alt="QR"
                     />
-
                   </div>
+                )}
 
-                  <div className="text-[8px] text-center mt-1 text-slate-500">
-                    Scan
-                  </div>
-
-                </div>
-              )}
+              </div>
 
             </div>
 
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow">
+          {/* CONTROLS */}
 
-            <h2 className="font-bold text-lg">
-              Template Controls
+          <div className="bg-white rounded-3xl shadow p-5">
+
+            <h2 className="font-bold text-xl">
+              🎨 Design Controls
             </h2>
 
-            <p className="text-slate-500 mt-2">
-              {locked
-                ? "🔒 Design locked — master template active."
-                : "✏️ Editing enabled — QR can be dragged."}
+            <p className="text-sm text-slate-500 mt-1">
+              Element select ಮಾಡಿ drag ಮಾಡಿ.
             </p>
 
-            <div className="grid gap-3 mt-5">
+            {/* ELEMENT LIST */}
 
-              <input
-                placeholder="Card title"
-                defaultValue="ಸಂಸ್ಥೆ ಸದಸ್ಯತ್ವ ಕಾರ್ಡ್"
-                disabled={locked}
-                className="border rounded-xl p-3"
-              />
+            <div className="mt-5">
 
-              <select
-                disabled={locked}
-                className="border rounded-xl p-3"
-              >
-                <option>
-                  85.6 × 53.9 mm
-                </option>
+              <h3 className="font-semibold mb-2">
+                Elements
+              </h3>
 
-                <option>
-                  Custom size
-                </option>
-              </select>
+              <div className="grid grid-cols-2 gap-2">
 
-              <button
-                disabled={locked}
-                className="border rounded-xl p-3"
-              >
-                + Add Text / Logo
-              </button>
+                {(Object.keys(
+                  labels
+                ) as ElementKey[]).map(
+                  (key) => (
+
+                    <button
+                      key={key}
+                      onClick={() =>
+                        setSelected(key)
+                      }
+                      className={`border rounded-xl px-3 py-3 text-left ${
+                        selected === key
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-slate-200"
+                      }`}
+                    >
+                      {key === "photo" &&
+                        "🖼️ "}
+
+                      {key === "name" &&
+                        "👤 "}
+
+                      {key === "designation" &&
+                        "💼 "}
+
+                      {key === "village" &&
+                        "🏠 "}
+
+                      {key === "mobile" &&
+                        "📱 "}
+
+                      {key === "memberId" &&
+                        "🆔 "}
+
+                      {key === "qr" &&
+                        "🔳 "}
+
+                      {labels[key]}
+                    </button>
+
+                  )
+                )}
+
+              </div>
 
             </div>
 
+            {/* SELECTED ELEMENT */}
+
             <div className="mt-6 border rounded-2xl p-4">
 
-              <h3 className="font-bold text-lg">
-                QR Code Position
+              <h3 className="font-bold">
+                Selected:{" "}
+                {labels[selected]}
               </h3>
-
-              <p className="text-sm text-slate-500 mt-1">
-                Card ಮೇಲಿರುವ QR Code ಅನ್ನು mouse ಮೂಲಕ drag ಮಾಡಿ ಬೇಕಾದ ಜಾಗದಲ್ಲಿ ಇಡಿ.
-              </p>
 
               <div className="mt-4">
 
                 <div className="flex justify-between text-sm mb-2">
 
                   <span>
-                    QR Size
+                    Width / Size
                   </span>
 
                   <b>
-                    {qrPosition.size}px
+                    {Math.round(
+                      layout[selected]
+                        .width
+                    )}
+                    px
                   </b>
 
                 </div>
 
                 <input
                   type="range"
-                  min="40"
-                  max="110"
-                  value={qrPosition.size}
+                  min="30"
+                  max="180"
+                  value={
+                    layout[selected]
+                      .width
+                  }
                   disabled={locked}
                   onChange={(e) =>
-                    changeQRSize(
+                    changeSize(
+                      selected,
                       Number(
                         e.target.value
                       )
@@ -536,13 +904,14 @@ function Card() {
                 <div className="border rounded-xl p-3">
 
                   <div className="text-xs text-slate-500">
-                    X Position
+                    X
                   </div>
 
                   <div className="font-bold">
                     {Math.round(
-                      qrPosition.x
-                    )}{" "}
+                      layout[selected]
+                        .x
+                    )}
                     px
                   </div>
 
@@ -551,13 +920,14 @@ function Card() {
                 <div className="border rounded-xl p-3">
 
                   <div className="text-xs text-slate-500">
-                    Y Position
+                    Y
                   </div>
 
                   <div className="font-bold">
                     {Math.round(
-                      qrPosition.y
-                    )}{" "}
+                      layout[selected]
+                        .y
+                    )}
                     px
                   </div>
 
@@ -565,23 +935,57 @@ function Card() {
 
               </div>
 
+            </div>
+
+            {/* ACTIONS */}
+
+            <div className="mt-5 grid gap-3">
+
               <button
-                onClick={resetQRPosition}
+                onClick={resetDesign}
                 disabled={locked}
-                className="w-full mt-4 border border-red-200 text-red-600 rounded-xl p-3 disabled:opacity-50"
+                className="border border-red-200 text-red-600 rounded-xl p-3 disabled:opacity-50"
               >
-                Reset QR Position
+                ♻️ Reset Design
+              </button>
+
+              <button
+                onClick={saveMasterDesign}
+                disabled={locked}
+                className="bg-purple-600 text-white rounded-xl p-3 disabled:opacity-50"
+              >
+                💾 Save Master Template
               </button>
 
             </div>
 
-            <div className="mt-6">
+            {/* LOCK INFO */}
 
-              <p className="font-semibold">
-                Back Preview
+            <div className="mt-5 bg-green-50 border border-green-200 rounded-2xl p-4">
+
+              <h3 className="font-bold text-green-800">
+                {locked
+                  ? "🔒 Design Locked"
+                  : "✏️ Editing Enabled"}
+              </h3>
+
+              <p className="text-sm text-green-700 mt-1">
+                {locked
+                  ? "Master design locked. Unlock ಮಾಡಿ edit ಮಾಡಬಹುದು."
+                  : "Cardನಲ್ಲಿ ಯಾವುದೇ element click ಮಾಡಿ drag ಮಾಡಬಹುದು."}
               </p>
 
-              <div className="pvc mt-2 rounded-xl border bg-white min-h-40 grid place-items-center text-center p-5">
+            </div>
+
+            {/* BACK */}
+
+            <div className="mt-6">
+
+              <h3 className="font-semibold">
+                Back Preview
+              </h3>
+
+              <div className="mt-2 rounded-xl border bg-white min-h-40 grid place-items-center text-center p-5">
 
                 <div>
 
@@ -596,22 +1000,6 @@ function Card() {
                 </div>
 
               </div>
-
-            </div>
-
-            <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4">
-
-              <h3 className="font-bold text-green-800">
-                QR Code
-              </h3>
-
-              <p className="text-sm text-green-700 mt-1">
-                ಈ QR Code scan ಮಾಡಿದಾಗ memberನ separate Public Page open ಆಗುತ್ತದೆ.
-              </p>
-
-              <p className="text-xs text-green-700 mt-2">
-                QR ಅನ್ನು drag ಮಾಡಿ ಬೇಕಾದ ಜಾಗಕ್ಕೆ ಇಡಬಹುದು. Size ಕೂಡ ಬದಲಾಯಿಸಬಹುದು.
-              </p>
 
             </div>
 
