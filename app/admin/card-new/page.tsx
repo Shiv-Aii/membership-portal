@@ -6,19 +6,30 @@ import AdminGuard from "@/components/AdminGuard";
 
 type Side = "front" | "back";
 
+type ElementKind =
+  | "text"
+  | "photo"
+  | "qr"
+  | "footer";
+
 type CardElement = {
   id: string;
   label: string;
+  kind: ElementKind;
   text: string;
   side: Side;
+
   x: number;
   y: number;
   width: number;
   height: number;
+
   fontSize: number;
   fontWeight: string;
   color: string;
   background: string;
+
+  borderRadius?: number;
 };
 
 const CARD_WIDTH = 856;
@@ -28,10 +39,11 @@ const initialElements: CardElement[] = [
   {
     id: "org-kn",
     label: "ಸಂಘಟನೆಯ ಹೆಸರು",
+    kind: "text",
     text: "ಕರ್ನಾಟಕ ರಾಜ್ಯ ರೈತ ಸಂಘ ಹಾಗೂ ಹಸಿರು ಸೇನೆ",
     side: "front",
     x: 190,
-    y: 30,
+    y: 25,
     width: 620,
     height: 45,
     fontSize: 28,
@@ -39,13 +51,15 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
+
   {
     id: "org-en",
     label: "Organization English Name",
+    kind: "text",
     text: "KARNATAKA RAJYA RAITHA SANGH & GREEN BRIGADE",
     side: "front",
     x: 205,
-    y: 78,
+    y: 72,
     width: 620,
     height: 32,
     fontSize: 18,
@@ -53,9 +67,11 @@ const initialElements: CardElement[] = [
     color: "#087332",
     background: "transparent",
   },
+
   {
     id: "reg",
     label: "Registration Number",
+    kind: "text",
     text: "RGE:303/1/23",
     side: "front",
     x: 690,
@@ -67,9 +83,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "name",
     label: "ಹೆಸರು",
+    kind: "text",
     text: "ಸದಸ್ಯರ ಹೆಸರು",
     side: "front",
     x: 300,
@@ -81,9 +99,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "membership",
     label: "Membership Number",
+    kind: "text",
     text: "KRRS/2026/000001",
     side: "front",
     x: 300,
@@ -95,9 +115,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "village",
     label: "ಗ್ರಾಮ",
+    kind: "text",
     text: "ಗ್ರಾಮದ ಹೆಸರು",
     side: "front",
     x: 300,
@@ -109,9 +131,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "taluk",
     label: "ತಾಲ್ಲೂಕು",
+    kind: "text",
     text: "ತಾಲ್ಲೂಕಿನ ಹೆಸರು",
     side: "front",
     x: 300,
@@ -123,9 +147,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "district",
     label: "ಜಿಲ್ಲೆ",
+    kind: "text",
     text: "ಜಿಲ್ಲೆಯ ಹೆಸರು",
     side: "front",
     x: 300,
@@ -137,9 +163,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "mobile",
     label: "ಮೊಬೈಲ್",
+    kind: "text",
     text: "9980XXXXXX",
     side: "front",
     x: 300,
@@ -151,9 +179,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "valid-from",
     label: "Valid From",
+    kind: "text",
     text: "VALID FROM: 13-08-2026",
     side: "front",
     x: 300,
@@ -165,9 +195,11 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "valid-till",
     label: "Valid Till",
+    kind: "text",
     text: "VALID TILL: 12-08-2027",
     side: "front",
     x: 560,
@@ -180,11 +212,46 @@ const initialElements: CardElement[] = [
     background: "#ffffff",
   },
 
+  {
+    id: "front-photo",
+    label: "Member Photo",
+    kind: "photo",
+    text: "",
+    side: "front",
+    x: 45,
+    y: 145,
+    width: 190,
+    height: 230,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#075c2b",
+    background: "#ffffff",
+    borderRadius: 12,
+  },
+
+  {
+    id: "front-qr",
+    label: "QR Code",
+    kind: "qr",
+    text: "",
+    side: "front",
+    x: 650,
+    y: 145,
+    width: 170,
+    height: 170,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#075c2b",
+    background: "#ffffff",
+    borderRadius: 12,
+  },
+
   /* BACK */
 
   {
     id: "back-title",
-    label: "Back Title",
+    label: "Back Heading",
+    kind: "text",
     text: "ಸದಸ್ಯತ್ವ ಗುರುತಿನ ಚೀಟಿ",
     side: "back",
     x: 180,
@@ -196,9 +263,11 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
+
   {
     id: "back-note",
     label: "Back Information",
+    kind: "text",
     text: "ಈ ಕಾರ್ಡ್ ಸಂಘಟನೆಯ ಸದಸ್ಯತ್ವವನ್ನು ದೃಢೀಕರಿಸುತ್ತದೆ.",
     side: "back",
     x: 90,
@@ -210,9 +279,11 @@ const initialElements: CardElement[] = [
     color: "#222222",
     background: "transparent",
   },
+
   {
     id: "back-valid-from",
     label: "Back Valid From",
+    kind: "text",
     text: "VALID FROM: 13-08-2026",
     side: "back",
     x: 100,
@@ -224,9 +295,11 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "back-valid-till",
     label: "Back Valid Till",
+    kind: "text",
     text: "VALID TILL: 12-08-2027",
     side: "back",
     x: 390,
@@ -237,6 +310,40 @@ const initialElements: CardElement[] = [
     fontWeight: "800",
     color: "#075c2b",
     background: "#ffffff",
+  },
+
+  {
+    id: "back-footer",
+    label: "Footer Heading",
+    kind: "footer",
+    text: "🌱 ರೈತರು ನಮ್ಮ ಹೆಮ್ಮೆ | 🚜 ರೈತ ಬೆಳೆ — ದೇಶದ ಬೆಳೆ | 🌾 ರೈತರಿಗೆ ನಮ್ಮ ಶಕ್ತಿ",
+    side: "back",
+    x: 45,
+    y: 475,
+    width: 766,
+    height: 45,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#ffffff",
+    background: "#075c2b",
+    borderRadius: 8,
+  },
+
+  {
+    id: "front-footer",
+    label: "Front Footer",
+    kind: "footer",
+    text: "🌱 ರೈತರು ನಮ್ಮ ಹೆಮ್ಮೆ",
+    side: "front",
+    x: 45,
+    y: 475,
+    width: 766,
+    height: 45,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#ffffff",
+    background: "#075c2b",
+    borderRadius: 8,
   },
 ];
 
@@ -254,26 +361,26 @@ export default function NewCardDesignerPage() {
     useState<string | null>(null);
 
   const [qrImage, setQrImage] =
-    useState<string>("");
+    useState("");
 
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef =
+    useRef<HTMLDivElement>(null);
 
-  const selected =
-    elements.find((e) => e.id === selectedId) || null;
-
-  /* QR CODE */
+  /* =========================
+     QR
+  ========================= */
 
   useEffect(() => {
     async function createQR() {
-      const url =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/verify?membership=KRRS/2026/000001`
-          : "https://example.com/verify";
-
       try {
+        const url =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/verify?membership=KRRS-2026-000001`
+            : "https://example.com/verify";
+
         const dataUrl =
           await QRCode.toDataURL(url, {
-            width: 180,
+            width: 300,
             margin: 1,
             color: {
               dark: "#075c2b",
@@ -282,15 +389,17 @@ export default function NewCardDesignerPage() {
           });
 
         setQrImage(dataUrl);
-      } catch {
-        setQrImage("");
+      } catch (error) {
+        console.error(error);
       }
     }
 
     createQR();
   }, []);
 
-  /* UPDATE ELEMENT */
+  /* =========================
+     UPDATE
+  ========================= */
 
   function updateElement(
     id: string,
@@ -299,23 +408,18 @@ export default function NewCardDesignerPage() {
     setElements((current) =>
       current.map((element) =>
         element.id === id
-          ? { ...element, ...changes }
+          ? {
+              ...element,
+              ...changes,
+            }
           : element
       )
     );
   }
 
-  /* DELETE ELEMENT */
-
-  function deleteElement(id: string) {
-    setElements((current) =>
-      current.filter((element) => element.id !== id)
-    );
-
-    setSelectedId(null);
-  }
-
-  /* DRAG */
+  /* =========================
+     DRAG
+  ========================= */
 
   function handlePointerDown(
     event: React.PointerEvent,
@@ -326,39 +430,62 @@ export default function NewCardDesignerPage() {
 
     setSelectedId(element.id);
 
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const startX =
+      event.clientX;
 
-    const originalX = element.x;
-    const originalY = element.y;
+    const startY =
+      event.clientY;
+
+    const originalX =
+      element.x;
+
+    const originalY =
+      element.y;
+
+    const rect =
+      cardRef.current?.getBoundingClientRect();
+
+    if (!rect) return;
 
     function move(e: PointerEvent) {
-      const dx =
-        ((e.clientX - startX) /
-          (cardRef.current?.getBoundingClientRect().width || CARD_WIDTH)) *
+      const scaleX =
+        rect!.width /
         CARD_WIDTH;
 
-      const dy =
-        ((e.clientY - startY) /
-          (cardRef.current?.getBoundingClientRect().height || CARD_HEIGHT)) *
+      const scaleY =
+        rect!.height /
         CARD_HEIGHT;
 
-      updateElement(element.id, {
-        x: Math.max(
-          0,
-          Math.min(
-            CARD_WIDTH - element.width,
-            originalX + dx
-          )
-        ),
-        y: Math.max(
-          0,
-          Math.min(
-            CARD_HEIGHT - element.height,
-            originalY + dy
-          )
-        ),
-      });
+      const dx =
+        (e.clientX - startX) /
+        scaleX;
+
+      const dy =
+        (e.clientY - startY) /
+        scaleY;
+
+      updateElement(
+        element.id,
+        {
+          x: Math.max(
+            0,
+            Math.min(
+              CARD_WIDTH -
+                element.width,
+              originalX + dx
+            )
+          ),
+
+          y: Math.max(
+            0,
+            Math.min(
+              CARD_HEIGHT -
+                element.height,
+              originalY + dy
+            )
+          ),
+        }
+      );
     }
 
     function up() {
@@ -384,7 +511,9 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* PHOTO */
+  /* =========================
+     PHOTO
+  ========================= */
 
   function handlePhoto(
     event: React.ChangeEvent<HTMLInputElement>
@@ -400,43 +529,78 @@ export default function NewCardDesignerPage() {
     setPhoto(url);
   }
 
-  /* RESET */
+  /* =========================
+     DELETE
+  ========================= */
+
+  function deleteElement(
+    id: string
+  ) {
+    setElements((current) =>
+      current.filter(
+        (element) =>
+          element.id !== id
+      )
+    );
+
+    setSelectedId(null);
+  }
+
+  /* =========================
+     RESET
+  ========================= */
 
   function resetDesign() {
-    setElements(initialElements);
+    setElements(
+      initialElements.map(
+        (element) => ({
+          ...element,
+        })
+      )
+    );
+
     setSelectedId(null);
     setSide("front");
   }
 
   const visibleElements =
     elements.filter(
-      (element) => element.side === side
+      (element) =>
+        element.side === side
     );
+
+  const selected =
+    elements.find(
+      (element) =>
+        element.id === selectedId
+    ) || null;
 
   return (
     <AdminGuard>
       <main className="min-h-screen bg-slate-100 p-4 md:p-6">
 
-        {/* HEADER */}
-
         <div className="max-w-[1500px] mx-auto">
 
-          <div className="bg-white rounded-2xl shadow p-4 mb-5 flex flex-wrap gap-3 items-center justify-between">
+          {/* HEADER */}
+
+          <div className="bg-white rounded-2xl shadow p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
 
             <div>
               <h1 className="text-2xl font-extrabold">
-                🪪 New PVC Card Designer
+                🪪 Farmer PVC Card Designer
               </h1>
 
               <p className="text-slate-500">
-                ಹೊಸ Card Design — ಎಲ್ಲ information editable
+                ಪ್ರತಿಯೊಂದು information ಅನ್ನು drag & edit ಮಾಡಬಹುದು
               </p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
 
               <button
-                onClick={() => setSide("front")}
+                onClick={() =>
+                  setSide("front")
+                }
                 className={`px-5 py-2 rounded-lg font-bold ${
                   side === "front"
                     ? "bg-green-700 text-white"
@@ -447,7 +611,9 @@ export default function NewCardDesignerPage() {
               </button>
 
               <button
-                onClick={() => setSide("back")}
+                onClick={() =>
+                  setSide("back")
+                }
                 className={`px-5 py-2 rounded-lg font-bold ${
                   side === "back"
                     ? "bg-green-700 text-white"
@@ -470,7 +636,7 @@ export default function NewCardDesignerPage() {
 
           <div className="grid lg:grid-cols-[1fr_330px] gap-5">
 
-            {/* CARD AREA */}
+            {/* CARD */}
 
             <section className="bg-slate-200 rounded-2xl p-4 md:p-8 overflow-auto">
 
@@ -494,13 +660,14 @@ export default function NewCardDesignerPage() {
                     border:
                       "4px solid #075c2b",
                     borderRadius: 22,
+                    touchAction: "none",
                   }}
                 >
 
-                  {/* TOP GREEN STRIP */}
+                  {/* TOP DESIGN */}
 
                   <div
-                    className="absolute left-0 right-0 top-0"
+                    className="absolute left-0 right-0 top-0 pointer-events-none"
                     style={{
                       height: 115,
                       background:
@@ -510,10 +677,10 @@ export default function NewCardDesignerPage() {
                     }}
                   />
 
-                  {/* FARM FIELD WATERMARK */}
+                  {/* FIELD BACKGROUND */}
 
                   <div
-                    className="absolute bottom-0 left-0 right-0"
+                    className="absolute left-0 right-0 bottom-0 pointer-events-none"
                     style={{
                       height: 150,
                       background:
@@ -522,130 +689,190 @@ export default function NewCardDesignerPage() {
                     }}
                   />
 
-                  {/* PHOTO */}
-
-                  {side === "front" && (
-                    <div
-                      className="absolute overflow-hidden rounded-xl border-4 border-green-800 bg-white"
-                      style={{
-                        left: 45,
-                        top: 145,
-                        width: 190,
-                        height: 230,
-                      }}
-                    >
-                      {photo ? (
-                        <img
-                          src={photo}
-                          alt="Member"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-center">
-                          <div>
-                            <div className="text-5xl">
-                              👤
-                            </div>
-                            <div className="mt-2 font-bold">
-                              Member Photo
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* QR */}
-
-                  {side === "front" && qrImage && (
-                    <div
-                      className="absolute bg-white p-2 rounded-xl border-4 border-green-800"
-                      style={{
-                        right: 40,
-                        top: 150,
-                        width: 180,
-                        height: 180,
-                      }}
-                    >
-                      <img
-                        src={qrImage}
-                        alt="QR"
-                        className="w-full h-full"
-                      />
-                    </div>
-                  )}
-
-                  {/* ELEMENTS */}
+                  {/* DRAGGABLE ELEMENTS */}
 
                   {visibleElements.map(
-                    (element) => (
-                      <div
-                        key={element.id}
-                        onPointerDown={(e) =>
-                          handlePointerDown(
-                            e,
-                            element
-                          )
-                        }
-                        onClick={() =>
-                          setSelectedId(
+                    (element) => {
+
+                      if (
+                        element.kind ===
+                        "photo"
+                      ) {
+                        return (
+                          <div
+                            key={element.id}
+                            onPointerDown={(e) =>
+                              handlePointerDown(
+                                e,
+                                element
+                              )
+                            }
+                            onClick={() =>
+                              setSelectedId(
+                                element.id
+                              )
+                            }
+                            className={`absolute cursor-move overflow-hidden border-4 border-green-800 bg-white ${
+                              selectedId ===
+                              element.id
+                                ? "ring-2 ring-blue-500"
+                                : ""
+                            }`}
+                            style={{
+                              left:
+                                element.x,
+                              top:
+                                element.y,
+                              width:
+                                element.width,
+                              height:
+                                element.height,
+                              borderRadius:
+                                element.borderRadius,
+                              zIndex: 20,
+                              touchAction:
+                                "none",
+                            }}
+                          >
+                            {photo ? (
+                              <img
+                                src={photo}
+                                alt="Member"
+                                draggable={false}
+                                className="w-full h-full object-cover pointer-events-none"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 pointer-events-none">
+                                <div className="text-5xl">
+                                  👤
+                                </div>
+                                <div className="font-bold">
+                                  Member Photo
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (
+                        element.kind ===
+                        "qr"
+                      ) {
+                        return (
+                          <div
+                            key={element.id}
+                            onPointerDown={(e) =>
+                              handlePointerDown(
+                                e,
+                                element
+                              )
+                            }
+                            onClick={() =>
+                              setSelectedId(
+                                element.id
+                              )
+                            }
+                            className={`absolute cursor-move bg-white border-4 border-green-800 p-2 ${
+                              selectedId ===
+                              element.id
+                                ? "ring-2 ring-blue-500"
+                                : ""
+                            }`}
+                            style={{
+                              left:
+                                element.x,
+                              top:
+                                element.y,
+                              width:
+                                element.width,
+                              height:
+                                element.height,
+                              borderRadius:
+                                element.borderRadius,
+                              zIndex: 30,
+                              touchAction:
+                                "none",
+                            }}
+                          >
+                            {qrImage && (
+                              <img
+                                src={qrImage}
+                                alt="QR Code"
+                                draggable={false}
+                                className="w-full h-full pointer-events-none"
+                              />
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={element.id}
+                          onPointerDown={(e) =>
+                            handlePointerDown(
+                              e,
+                              element
+                            )
+                          }
+                          onClick={() =>
+                            setSelectedId(
+                              element.id
+                            )
+                          }
+                          className={`absolute cursor-move flex items-center overflow-hidden ${
+                            selectedId ===
                             element.id
-                          )
-                        }
-                        className={`absolute cursor-move flex items-center overflow-hidden ${
-                          selectedId ===
-                          element.id
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                        style={{
-                          left: element.x,
-                          top: element.y,
-                          width: element.width,
-                          height: element.height,
-                          fontSize:
-                            element.fontSize,
-                          fontWeight:
-                            element.fontWeight,
-                          color:
-                            element.color,
-                          background:
-                            element.background,
-                          padding:
-                            element.background !==
-                            "transparent"
-                              ? 6
-                              : 0,
-                          borderRadius: 8,
-                          zIndex: 10,
-                        }}
-                      >
-                        {element.text}
-                      </div>
-                    )
+                              ? "ring-2 ring-blue-500"
+                              : ""
+                          }`}
+                          style={{
+                            left:
+                              element.x,
+                            top:
+                              element.y,
+                            width:
+                              element.width,
+                            height:
+                              element.height,
+                            fontSize:
+                              element.fontSize,
+                            fontWeight:
+                              element.fontWeight,
+                            color:
+                              element.color,
+                            background:
+                              element.background,
+                            padding:
+                              element.background !==
+                              "transparent"
+                                ? 6
+                                : 0,
+                            borderRadius:
+                              element.borderRadius ||
+                              0,
+                            zIndex:
+                              element.kind ===
+                              "footer"
+                                ? 40
+                                : 50,
+                            touchAction:
+                              "none",
+                          }}
+                        >
+                          {element.text}
+                        </div>
+                      );
+                    }
                   )}
-
-                  {/* FOOTER */}
-
-                  <div
-                    className="absolute bottom-0 left-0 right-0 bg-green-900 text-white text-center font-bold py-3"
-                    style={{
-                      fontSize: 17,
-                    }}
-                  >
-                    🌱 ರೈತರು ನಮ್ಮ ಹೆಮ್ಮೆ
-                    &nbsp; | &nbsp;
-                    🚜 ರೈತ ಬೆಳೆ — ದೇಶದ ಬೆಳೆ
-                    &nbsp; | &nbsp;
-                    🌾 ರೈತರಿಗೆ ನಮ್ಮ ಶಕ್ತಿ
-                  </div>
 
                 </div>
 
               </div>
 
               <p className="text-center text-sm text-slate-500 mt-4">
-                💡 Information ಮೇಲೆ click ಮಾಡಿ → drag ಮಾಡಿ position set ಮಾಡಿ
+                💡 Photo / QR / Heading / Text ಮೇಲೆ press ಮಾಡಿ drag ಮಾಡಿ
               </p>
 
             </section>
@@ -658,7 +885,7 @@ export default function NewCardDesignerPage() {
                 ✏️ Edit Information
               </h2>
 
-              {/* PHOTO */}
+              {/* PHOTO UPLOAD */}
 
               <div className="mb-5">
 
@@ -675,16 +902,18 @@ export default function NewCardDesignerPage() {
 
               </div>
 
-              {/* ELEMENT LIST */}
+              {/* FIELD SELECT */}
 
               <div className="mb-5">
 
                 <label className="block font-bold mb-2">
-                  Select Information
+                  Select Field
                 </label>
 
                 <select
-                  value={selectedId || ""}
+                  value={
+                    selectedId || ""
+                  }
                   onChange={(e) =>
                     setSelectedId(
                       e.target.value
@@ -692,6 +921,7 @@ export default function NewCardDesignerPage() {
                   }
                   className="w-full border rounded-lg px-3 py-2"
                 >
+
                   <option value="">
                     Select field
                   </option>
@@ -704,11 +934,14 @@ export default function NewCardDesignerPage() {
                     .map((element) => (
                       <option
                         key={element.id}
-                        value={element.id}
+                        value={
+                          element.id
+                        }
                       >
                         {element.label}
                       </option>
                     ))}
+
                 </select>
 
               </div>
@@ -718,89 +951,102 @@ export default function NewCardDesignerPage() {
 
                   {/* TEXT */}
 
-                  <div>
+                  {selected.kind !==
+                    "photo" &&
+                    selected.kind !==
+                      "qr" && (
+                      <div>
+                        <label className="block font-semibold mb-1">
+                          Text
+                        </label>
 
-                    <label className="block font-semibold mb-1">
-                      Text
-                    </label>
-
-                    <textarea
-                      value={selected.text}
-                      onChange={(e) =>
-                        updateElement(
-                          selected.id,
-                          {
-                            text:
-                              e.target.value,
+                        <textarea
+                          value={
+                            selected.text
                           }
-                        )
-                      }
-                      rows={3}
-                      className="w-full border rounded-lg p-2"
-                    />
-
-                  </div>
-
-                  {/* FONT SIZE */}
-
-                  <div>
-
-                    <label className="block font-semibold mb-1">
-                      Font Size
-                    </label>
-
-                    <input
-                      type="number"
-                      value={
-                        selected.fontSize
-                      }
-                      onChange={(e) =>
-                        updateElement(
-                          selected.id,
-                          {
-                            fontSize:
-                              Number(
-                                e.target.value
-                              ),
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                text:
+                                  e.target
+                                    .value,
+                              }
+                            )
                           }
-                        )
-                      }
-                      className="w-full border rounded-lg p-2"
-                    />
+                          rows={3}
+                          className="w-full border rounded-lg p-2"
+                        />
+                      </div>
+                    )}
 
-                  </div>
+                  {/* FONT */}
+
+                  {selected.kind !==
+                    "photo" &&
+                    selected.kind !==
+                      "qr" && (
+                      <div>
+                        <label className="block font-semibold mb-1">
+                          Font Size
+                        </label>
+
+                        <input
+                          type="number"
+                          value={
+                            selected.fontSize
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                fontSize:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-lg p-2"
+                        />
+                      </div>
+                    )}
 
                   {/* COLOR */}
 
-                  <div>
+                  {selected.kind !==
+                    "photo" &&
+                    selected.kind !==
+                      "qr" && (
+                      <div>
+                        <label className="block font-semibold mb-1">
+                          Text Color
+                        </label>
 
-                    <label className="block font-semibold mb-1">
-                      Text Color
-                    </label>
-
-                    <input
-                      type="color"
-                      value={
-                        selected.color
-                      }
-                      onChange={(e) =>
-                        updateElement(
-                          selected.id,
-                          {
-                            color:
-                              e.target.value,
+                        <input
+                          type="color"
+                          value={
+                            selected.color
                           }
-                        )
-                      }
-                      className="w-full h-10"
-                    />
-
-                  </div>
+                          onChange={(e) =>
+                            updateElement(
+                              selected.id,
+                              {
+                                color:
+                                  e.target
+                                    .value,
+                              }
+                            )
+                          }
+                          className="w-full h-10"
+                        />
+                      </div>
+                    )}
 
                   {/* X */}
 
                   <div>
-
                     <label className="block font-semibold mb-1">
                       X Position
                     </label>
@@ -815,20 +1061,19 @@ export default function NewCardDesignerPage() {
                           selected.id,
                           {
                             x: Number(
-                              e.target.value
+                              e.target
+                                .value
                             ),
                           }
                         )
                       }
                       className="w-full border rounded-lg p-2"
                     />
-
                   </div>
 
                   {/* Y */}
 
                   <div>
-
                     <label className="block font-semibold mb-1">
                       Y Position
                     </label>
@@ -843,20 +1088,19 @@ export default function NewCardDesignerPage() {
                           selected.id,
                           {
                             y: Number(
-                              e.target.value
+                              e.target
+                                .value
                             ),
                           }
                         )
                       }
                       className="w-full border rounded-lg p-2"
                     />
-
                   </div>
 
                   {/* WIDTH */}
 
                   <div>
-
                     <label className="block font-semibold mb-1">
                       Width
                     </label>
@@ -871,32 +1115,63 @@ export default function NewCardDesignerPage() {
                           selected.id,
                           {
                             width: Number(
-                              e.target.value
+                              e.target
+                                .value
                             ),
                           }
                         )
                       }
                       className="w-full border rounded-lg p-2"
                     />
+                  </div>
 
+                  {/* HEIGHT */}
+
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Height
+                    </label>
+
+                    <input
+                      type="number"
+                      value={Math.round(
+                        selected.height
+                      )}
+                      onChange={(e) =>
+                        updateElement(
+                          selected.id,
+                          {
+                            height: Number(
+                              e.target
+                                .value
+                            ),
+                          }
+                        )
+                      }
+                      className="w-full border rounded-lg p-2"
+                    />
                   </div>
 
                   {/* DELETE */}
 
                   {!selected.id.includes(
                     "valid"
-                  ) && (
-                    <button
-                      onClick={() =>
-                        deleteElement(
-                          selected.id
-                        )
-                      }
-                      className="w-full bg-red-600 text-white rounded-lg py-3 font-bold"
-                    >
-                      🗑️ Remove Field
-                    </button>
-                  )}
+                  ) &&
+                    selected.kind !==
+                      "photo" &&
+                    selected.kind !==
+                      "qr" && (
+                      <button
+                        onClick={() =>
+                          deleteElement(
+                            selected.id
+                          )
+                        }
+                        className="w-full bg-red-600 text-white rounded-lg py-3 font-bold"
+                      >
+                        🗑️ Remove Field
+                      </button>
+                    )}
 
                 </div>
               )}
