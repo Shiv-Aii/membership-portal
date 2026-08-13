@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import QRCode from "qrcode";
-import { useSearchParams } from "next/navigation";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
@@ -36,22 +41,6 @@ type CardElement = {
   src?: string;
 };
 
-type Member = {
-  id: string;
-  name?: string | null;
-  membership_no?: string | number | null;
-  designation?: string | null;
-  village?: string | null;
-  taluk?: string | null;
-  district?: string | null;
-  mobile?: string | null;
-  aadhaar?: string | null;
-  photo_url?: string | null;
-  valid_from?: string | null;
-  valid_until?: string | null;
-  status?: string | null;
-};
-
 const CARD_WIDTH = 856;
 const CARD_HEIGHT = 539;
 
@@ -73,6 +62,7 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
+
   {
     id: "org-en",
     label: "English Organization Name",
@@ -88,6 +78,7 @@ const initialElements: CardElement[] = [
     color: "#087332",
     background: "transparent",
   },
+
   {
     id: "reg",
     label: "Registration Number",
@@ -103,6 +94,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "name",
     label: "ಹೆಸರು",
@@ -118,6 +110,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "membership",
     label: "Membership Number",
@@ -133,6 +126,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "village",
     label: "ಗ್ರಾಮ",
@@ -148,6 +142,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "taluk",
     label: "ತಾಲ್ಲೂಕು",
@@ -163,6 +158,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "district",
     label: "ಜಿಲ್ಲೆ",
@@ -178,6 +174,7 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "mobile",
     label: "ಮೊಬೈಲ್",
@@ -193,11 +190,12 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
+
   {
     id: "valid-from",
     label: "Valid From",
     kind: "text",
-    text: "VALID FROM: {{valid_from}}",
+    text: "VALID FROM: 13-08-2026",
     side: "front",
     x: 300,
     y: 415,
@@ -208,11 +206,12 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "valid-till",
     label: "Valid Till",
     kind: "text",
-    text: "VALID TILL: {{valid_until}}",
+    text: "VALID TILL: 12-08-2027",
     side: "front",
     x: 560,
     y: 415,
@@ -223,6 +222,7 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "front-photo",
     label: "Member Photo",
@@ -239,6 +239,7 @@ const initialElements: CardElement[] = [
     background: "#ffffff",
     borderRadius: 12,
   },
+
   {
     id: "front-qr",
     label: "QR Code",
@@ -255,6 +256,7 @@ const initialElements: CardElement[] = [
     background: "#ffffff",
     borderRadius: 12,
   },
+
   {
     id: "back-title",
     label: "Back Heading",
@@ -270,6 +272,7 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
+
   {
     id: "back-note",
     label: "Back Information",
@@ -285,11 +288,12 @@ const initialElements: CardElement[] = [
     color: "#222222",
     background: "transparent",
   },
+
   {
     id: "back-valid-from",
     label: "Back Valid From",
     kind: "text",
-    text: "VALID FROM: {{valid_from}}",
+    text: "VALID FROM: 13-08-2026",
     side: "back",
     x: 100,
     y: 400,
@@ -300,11 +304,12 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "back-valid-till",
     label: "Back Valid Till",
     kind: "text",
-    text: "VALID TILL: {{valid_until}}",
+    text: "VALID TILL: 12-08-2027",
     side: "back",
     x: 390,
     y: 400,
@@ -315,6 +320,7 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
+
   {
     id: "front-footer",
     label: "Front Footer",
@@ -331,6 +337,7 @@ const initialElements: CardElement[] = [
     background: "#075c2b",
     borderRadius: 8,
   },
+
   {
     id: "back-footer",
     label: "Back Footer",
@@ -350,7 +357,9 @@ const initialElements: CardElement[] = [
 ];
 
 function cloneElements(elements: CardElement[]) {
-  return elements.map((e) => ({ ...e }));
+  return elements.map((e) => ({
+    ...e,
+  }));
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -367,25 +376,7 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return `${String(date.getDate()).padStart(2, "0")}-${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}-${date.getFullYear()}`;
-}
-
-export default function NewCardDesignerPage() {
-  const searchParams = useSearchParams();
-
-  const memberId = searchParams.get("id");
-
+function NewCardDesignerPageContent() {
   const [elements, setElements] = useState<CardElement[]>(
     cloneElements(initialElements)
   );
@@ -395,151 +386,84 @@ export default function NewCardDesignerPage() {
   const [selectedId, setSelectedId] =
     useState<string | null>("name");
 
-  const [member, setMember] =
-    useState<Member | null>(null);
-
   const [memberPhoto, setMemberPhoto] =
     useState<string | null>(null);
 
-  const [qrImage, setQrImage] =
-    useState("");
+  const [qrImage, setQrImage] = useState("");
 
   const [templateId, setTemplateId] =
     useState<number | null>(null);
 
-  const [locked, setLocked] =
-    useState(false);
+  const [locked, setLocked] = useState(false);
 
   const [loadingTemplate, setLoadingTemplate] =
     useState(true);
 
-  const [loadingMember, setLoadingMember] =
-    useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [saving, setSaving] =
-    useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const cardRef =
-    useRef<HTMLDivElement>(null);
-
-  /* =====================================================
-     LOAD APPROVED MEMBER
-  ===================================================== */
-
-  useEffect(() => {
-    async function loadMember() {
-      if (!memberId) {
-        setMember(null);
-        setLoadingMember(false);
-        return;
-      }
-
-      setLoadingMember(true);
-
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("id", memberId)
-        .eq("status", "approved")
-        .maybeSingle();
-
-      if (error) {
-        console.error(
-          "Member load error:",
-          error
-        );
-
-        alert(
-          "Approved Member load ಆಗಲಿಲ್ಲ:\n\n" +
-            error.message
-        );
-
-        setMember(null);
-        setLoadingMember(false);
-        return;
-      }
-
-      if (!data) {
-        alert(
-          "ಈ IDಗೆ Approved Member ಸಿಗಲಿಲ್ಲ."
-        );
-
-        setMember(null);
-        setLoadingMember(false);
-        return;
-      }
-
-      const loadedMember =
-        data as Member;
-
-      setMember(loadedMember);
-
-      if (loadedMember.photo_url) {
-        setMemberPhoto(
-          loadedMember.photo_url
-        );
-      }
-
-      setLoadingMember(false);
-    }
-
-    loadMember();
-  }, [memberId]);
-
-  /* =====================================================
-     LOAD TEMPLATE
-  ===================================================== */
+  /*
+  =========================================
+  LOAD TEMPLATE
+  =========================================
+  */
 
   useEffect(() => {
     async function loadTemplate() {
       setLoadingTemplate(true);
 
-      const { data, error } = await supabase
-        .from("card_templates")
-        .select(
-          "id, name, design, is_locked"
-        )
-        .eq(
-          "name",
-          TEMPLATE_NAME
-        )
-        .order("id", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("card_templates")
+          .select(
+            "id, name, design, is_locked"
+          )
+          .eq("name", TEMPLATE_NAME)
+          .order("id", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
+        if (error) {
+          console.error(
+            "Template load error:",
+            error
+          );
+
+          setLoadingTemplate(false);
+          return;
+        }
+
+        if (data) {
+          setTemplateId(data.id);
+
+          setLocked(
+            Boolean(data.is_locked)
+          );
+
+          const design = data.design as any;
+
+          if (
+            design &&
+            Array.isArray(
+              design.elements
+            ) &&
+            design.elements.length > 0
+          ) {
+            setElements(
+              cloneElements(
+                design.elements
+              )
+            );
+          }
+        }
+      } catch (error) {
         console.error(
-          "Template load error:",
+          "Template loading error:",
           error
         );
-
-        setLoadingTemplate(false);
-        return;
-      }
-
-      if (data) {
-        setTemplateId(data.id);
-
-        setLocked(
-          Boolean(data.is_locked)
-        );
-
-        const design =
-          data.design as any;
-
-        if (
-          design &&
-          Array.isArray(
-            design.elements
-          ) &&
-          design.elements.length > 0
-        ) {
-          setElements(
-            design.elements
-          );
-        }
       }
 
       setLoadingTemplate(false);
@@ -548,25 +472,19 @@ export default function NewCardDesignerPage() {
     loadTemplate();
   }, []);
 
-  /* =====================================================
-     QR CODE
-  ===================================================== */
+  /*
+  =========================================
+  QR CODE
+  =========================================
+  */
 
   useEffect(() => {
     async function createQR() {
       try {
-        const membership =
-          member?.membership_no ||
-          "MEMBERSHIP_NUMBER";
-
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?membership=${encodeURIComponent(
-                String(membership)
-              )}`
-            : `https://example.com/verify?membership=${encodeURIComponent(
-                String(membership)
-              )}`;
+            ? `${window.location.origin}/verify?membership=MEMBERSHIP_NUMBER`
+            : "https://example.com/verify";
 
         const image =
           await QRCode.toDataURL(
@@ -584,213 +502,20 @@ export default function NewCardDesignerPage() {
         setQrImage(image);
       } catch (error) {
         console.error(
-          "QR error:",
+          "QR generation error:",
           error
         );
       }
     }
 
     createQR();
-  }, [
-    member?.membership_no,
-  ]);
+  }, []);
 
-  /* =====================================================
-     MEMBER VALUE
-  ===================================================== */
-
-  function getElementText(
-    element: CardElement
-  ) {
-    if (!member) {
-      return element.text;
-    }
-
-    const id =
-      element.id.toLowerCase();
-
-    const label =
-      element.label.toLowerCase();
-
-    const combined =
-      `${id} ${label}`;
-
-    if (
-      id === "name" ||
-      combined.includes("ಹೆಸರು") ||
-      combined.includes("name")
-    ) {
-      return (
-        member.name ||
-        element.text
-      );
-    }
-
-    if (
-      id === "membership" ||
-      combined.includes(
-        "membership"
-      )
-    ) {
-      return member.membership_no
-        ? String(
-            member.membership_no
-          )
-        : element.text;
-    }
-
-    if (
-      id === "village" ||
-      combined.includes("ಗ್ರಾಮ") ||
-      combined.includes("village")
-    ) {
-      return (
-        member.village ||
-        element.text
-      );
-    }
-
-    if (
-      id === "taluk" ||
-      combined.includes("ತಾಲ್ಲೂಕು") ||
-      combined.includes("taluk")
-    ) {
-      return (
-        member.taluk ||
-        element.text
-      );
-    }
-
-    if (
-      id === "district" ||
-      combined.includes("ಜಿಲ್ಲೆ") ||
-      combined.includes("district")
-    ) {
-      return (
-        member.district ||
-        element.text
-      );
-    }
-
-    if (
-      id === "mobile" ||
-      combined.includes("ಮೊಬೈಲ್") ||
-      combined.includes("mobile") ||
-      combined.includes("phone")
-    ) {
-      return (
-        member.mobile ||
-        element.text
-      );
-    }
-
-    if (
-      id === "valid-from" ||
-      id === "back-valid-from" ||
-      combined.includes(
-        "valid from"
-      )
-    ) {
-      if (member.valid_from) {
-        return `VALID FROM: ${formatDate(
-          member.valid_from
-        )}`;
-      }
-
-      return element.text;
-    }
-
-    if (
-      id === "valid-till" ||
-      id === "back-valid-till" ||
-      combined.includes(
-        "valid till"
-      ) ||
-      combined.includes(
-        "valid until"
-      )
-    ) {
-      if (member.valid_until) {
-        return `VALID TILL: ${formatDate(
-          member.valid_until
-        )}`;
-      }
-
-      return element.text;
-    }
-
-    if (
-      combined.includes(
-        "{{valid_from}}"
-      )
-    ) {
-      return element.text.replace(
-        "{{valid_from}}",
-        formatDate(
-          member.valid_from
-        )
-      );
-    }
-
-    if (
-      combined.includes(
-        "{{valid_until}}"
-      )
-    ) {
-      return element.text.replace(
-        "{{valid_until}}",
-        formatDate(
-          member.valid_until
-        )
-      );
-    }
-
-    return element.text
-      .replace(
-        "{{name}}",
-        member.name || ""
-      )
-      .replace(
-        "{{membership_no}}",
-        member.membership_no
-          ? String(
-              member.membership_no
-            )
-          : ""
-      )
-      .replace(
-        "{{village}}",
-        member.village || ""
-      )
-      .replace(
-        "{{taluk}}",
-        member.taluk || ""
-      )
-      .replace(
-        "{{district}}",
-        member.district || ""
-      )
-      .replace(
-        "{{mobile}}",
-        member.mobile || ""
-      )
-      .replace(
-        "{{valid_from}}",
-        formatDate(
-          member.valid_from
-        )
-      )
-      .replace(
-        "{{valid_until}}",
-        formatDate(
-          member.valid_until
-        )
-      );
-  }
-
-  /* =====================================================
-     UPDATE
-  ===================================================== */
+  /*
+  =========================================
+  UPDATE ELEMENT
+  =========================================
+  */
 
   function updateElement(
     id: string,
@@ -810,13 +535,13 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* =====================================================
-     DELETE
-  ===================================================== */
+  /*
+  =========================================
+  DELETE ELEMENT
+  =========================================
+  */
 
-  function deleteElement(
-    id: string
-  ) {
+  function deleteElement(id: string) {
     if (locked) return;
 
     setElements((current) =>
@@ -829,9 +554,11 @@ export default function NewCardDesignerPage() {
     setSelectedId(null);
   }
 
-  /* =====================================================
-     DRAG
-  ===================================================== */
+  /*
+  =========================================
+  DRAG ELEMENT
+  =========================================
+  */
 
   function handlePointerDown(
     event: React.PointerEvent,
@@ -842,46 +569,32 @@ export default function NewCardDesignerPage() {
     event.preventDefault();
     event.stopPropagation();
 
-    setSelectedId(
-      element.id
-    );
+    setSelectedId(element.id);
 
-    const startX =
-      event.clientX;
+    const startX = event.clientX;
+    const startY = event.clientY;
 
-    const startY =
-      event.clientY;
-
-    const originalX =
-      element.x;
-
-    const originalY =
-      element.y;
+    const originalX = element.x;
+    const originalY = element.y;
 
     const rect =
       cardRef.current?.getBoundingClientRect();
 
     if (!rect) return;
 
-    function move(
-      e: PointerEvent
-    ) {
+    function move(e: PointerEvent) {
       const scaleX =
-        rect!.width /
-        CARD_WIDTH;
+        rect!.width / CARD_WIDTH;
 
       const scaleY =
-        rect!.height /
-        CARD_HEIGHT;
+        rect!.height / CARD_HEIGHT;
 
       const dx =
-        (e.clientX -
-          startX) /
+        (e.clientX - startX) /
         scaleX;
 
       const dy =
-        (e.clientY -
-          startY) /
+        (e.clientY - startY) /
         scaleY;
 
       updateElement(
@@ -931,45 +644,46 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* =====================================================
-     ADD TEXT
-  ===================================================== */
+  /*
+  =========================================
+  ADD TEXT
+  =========================================
+  */
 
   function addText() {
     if (locked) return;
 
-    const newElement: CardElement =
-      {
-        id: `text-${Date.now()}`,
-        label: "New Text",
-        kind: "text",
-        text: "ಹೊಸ Text",
-        side,
-        x: 250,
-        y: 250,
-        width: 300,
-        height: 45,
-        fontSize: 20,
-        fontWeight: "600",
-        color: "#111111",
-        background: "transparent",
-      };
+    const newElement: CardElement = {
+      id: `text-${Date.now()}`,
+      label: "New Text",
+      kind: "text",
+      text: "ಹೊಸ Text",
+      side,
+      x: 250,
+      y: 250,
+      width: 300,
+      height: 45,
+      fontSize: 20,
+      fontWeight: "600",
+      color: "#111111",
+      background: "transparent",
+    };
 
-    setElements(
-      (current) => [
-        ...current,
-        newElement,
-      ]
-    );
+    setElements((current) => [
+      ...current,
+      newElement,
+    ]);
 
     setSelectedId(
       newElement.id
     );
   }
 
-  /* =====================================================
-     ADD IMAGE
-  ===================================================== */
+  /*
+  =========================================
+  ADD IMAGE
+  =========================================
+  */
 
   async function addImage(
     event: React.ChangeEvent<HTMLInputElement>
@@ -983,35 +697,30 @@ export default function NewCardDesignerPage() {
 
     try {
       const dataUrl =
-        await fileToDataUrl(
-          file
-        );
+        await fileToDataUrl(file);
 
-      const newElement: CardElement =
-        {
-          id: `image-${Date.now()}`,
-          label: "New Image",
-          kind: "image",
-          text: "",
-          side,
-          x: 250,
-          y: 180,
-          width: 180,
-          height: 120,
-          fontSize: 18,
-          fontWeight: "600",
-          color: "#111111",
-          background: "#ffffff",
-          borderRadius: 10,
-          src: dataUrl,
-        };
+      const newElement: CardElement = {
+        id: `image-${Date.now()}`,
+        label: "New Image",
+        kind: "image",
+        text: "",
+        side,
+        x: 250,
+        y: 180,
+        width: 180,
+        height: 120,
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#111111",
+        background: "#ffffff",
+        borderRadius: 10,
+        src: dataUrl,
+      };
 
-      setElements(
-        (current) => [
-          ...current,
-          newElement,
-        ]
-      );
+      setElements((current) => [
+        ...current,
+        newElement,
+      ]);
 
       setSelectedId(
         newElement.id
@@ -1027,9 +736,11 @@ export default function NewCardDesignerPage() {
     event.target.value = "";
   }
 
-  /* =====================================================
-     MEMBER PHOTO
-  ===================================================== */
+  /*
+  =========================================
+  MEMBER PHOTO
+  =========================================
+  */
 
   async function uploadMemberPhoto(
     event: React.ChangeEvent<HTMLInputElement>
@@ -1043,13 +754,9 @@ export default function NewCardDesignerPage() {
 
     try {
       const dataUrl =
-        await fileToDataUrl(
-          file
-        );
+        await fileToDataUrl(file);
 
-      setMemberPhoto(
-        dataUrl
-      );
+      setMemberPhoto(dataUrl);
 
       const photoElement =
         elements.find(
@@ -1073,9 +780,11 @@ export default function NewCardDesignerPage() {
     event.target.value = "";
   }
 
-  /* =====================================================
-     SAVE TEMPLATE
-  ===================================================== */
+  /*
+  =========================================
+  SAVE TEMPLATE
+  =========================================
+  */
 
   async function saveTemplate() {
     if (locked) {
@@ -1090,10 +799,8 @@ export default function NewCardDesignerPage() {
 
     const design = {
       version: 1,
-      cardWidth:
-        CARD_WIDTH,
-      cardHeight:
-        CARD_HEIGHT,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
       elements,
     };
 
@@ -1101,12 +808,9 @@ export default function NewCardDesignerPage() {
       if (templateId) {
         const { error } =
           await supabase
-            .from(
-              "card_templates"
-            )
+            .from("card_templates")
             .update({
-              name:
-                TEMPLATE_NAME,
+              name: TEMPLATE_NAME,
               design,
               updated_at:
                 new Date().toISOString(),
@@ -1116,34 +820,27 @@ export default function NewCardDesignerPage() {
               templateId
             );
 
-        if (error)
+        if (error) {
           throw error;
+        }
       } else {
-        const {
-          data,
-          error,
-        } =
+        const { data, error } =
           await supabase
-            .from(
-              "card_templates"
-            )
+            .from("card_templates")
             .insert({
-              name:
-                TEMPLATE_NAME,
+              name: TEMPLATE_NAME,
               design,
-              is_locked:
-                false,
+              is_locked: false,
             })
             .select("id")
             .single();
 
-        if (error)
+        if (error) {
           throw error;
+        }
 
         if (data?.id) {
-          setTemplateId(
-            data.id
-          );
+          setTemplateId(data.id);
         }
       }
 
@@ -1163,9 +860,11 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =====================================================
-     LOCK
-  ===================================================== */
+  /*
+  =========================================
+  LOCK TEMPLATE
+  =========================================
+  */
 
   async function lockTemplate() {
     if (saving) return;
@@ -1189,22 +888,17 @@ export default function NewCardDesignerPage() {
     try {
       const design = {
         version: 1,
-        cardWidth:
-          CARD_WIDTH,
-        cardHeight:
-          CARD_HEIGHT,
+        cardWidth: CARD_WIDTH,
+        cardHeight: CARD_HEIGHT,
         elements,
       };
 
       const { error } =
         await supabase
-          .from(
-            "card_templates"
-          )
+          .from("card_templates")
           .update({
             design,
-            is_locked:
-              true,
+            is_locked: true,
             updated_at:
               new Date().toISOString(),
           })
@@ -1213,8 +907,9 @@ export default function NewCardDesignerPage() {
             templateId
           );
 
-      if (error)
+      if (error) {
         throw error;
+      }
 
       setLocked(true);
 
@@ -1234,13 +929,14 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =====================================================
-     UNLOCK
-  ===================================================== */
+  /*
+  =========================================
+  UNLOCK TEMPLATE
+  =========================================
+  */
 
   async function unlockTemplate() {
-    if (!templateId)
-      return;
+    if (!templateId) return;
 
     const ok = confirm(
       "🔓 Template Unlock ಮಾಡಬೇಕೇ?"
@@ -1253,12 +949,9 @@ export default function NewCardDesignerPage() {
     try {
       const { error } =
         await supabase
-          .from(
-            "card_templates"
-          )
+          .from("card_templates")
           .update({
-            is_locked:
-              false,
+            is_locked: false,
             updated_at:
               new Date().toISOString(),
           })
@@ -1267,8 +960,9 @@ export default function NewCardDesignerPage() {
             templateId
           );
 
-      if (error)
+      if (error) {
         throw error;
+      }
 
       setLocked(false);
 
@@ -1288,9 +982,11 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =====================================================
-     RESET
-  ===================================================== */
+  /*
+  =========================================
+  RESET
+  =========================================
+  */
 
   function resetDesign() {
     if (locked) return;
@@ -1308,7 +1004,10 @@ export default function NewCardDesignerPage() {
     );
 
     setSelectedId(null);
+
     setSide("front");
+
+    setMemberPhoto(null);
   }
 
   const visibleElements =
@@ -1320,30 +1019,26 @@ export default function NewCardDesignerPage() {
   const selected =
     elements.find(
       (element) =>
-        element.id ===
-        selectedId
+        element.id === selectedId
     ) || null;
 
-  /* =====================================================
-     LOADING
-  ===================================================== */
+  /*
+  =========================================
+  LOADING
+  =========================================
+  */
 
-  if (
-    loadingTemplate ||
-    loadingMember
-  ) {
+  if (loadingTemplate) {
     return (
       <AdminGuard>
-        <main className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+        <main className="min-h-screen flex items-center justify-center bg-slate-100">
           <div className="bg-white rounded-2xl shadow p-8 text-center">
             <div className="text-3xl mb-3">
               ⏳
             </div>
 
             <div className="font-bold">
-              {loadingMember
-                ? "Member Loading..."
-                : "Card Template Loading..."}
+              Card Template Loading...
             </div>
           </div>
         </main>
@@ -1351,42 +1046,15 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* =====================================================
-     NO MEMBER
-  ===================================================== */
-
-  if (!memberId || !member) {
-    return (
-      <AdminGuard>
-        <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow p-8 text-center max-w-lg">
-            <div className="text-5xl mb-4">
-              ⚠️
-            </div>
-
-            <h1 className="text-2xl font-extrabold">
-              Approved Member ಸಿಗಲಿಲ್ಲ
-            </h1>
-
-            <p className="text-slate-500 mt-3">
-              Admin Dashboardನ Approved
-              Memberನ Card button ಮೂಲಕ
-              ಈ page open ಮಾಡಿ.
-            </p>
-          </div>
-        </main>
-      </AdminGuard>
-    );
-  }
-
-  /* =====================================================
-     PAGE
-  ===================================================== */
+  /*
+  =========================================
+  PAGE
+  =========================================
+  */
 
   return (
     <AdminGuard>
       <main className="min-h-screen bg-slate-100 p-4 md:p-6">
-
         <div className="max-w-[1500px] mx-auto">
 
           {/* HEADER */}
@@ -1396,7 +1064,6 @@ export default function NewCardDesignerPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
 
               <div>
-
                 <h1 className="text-2xl font-extrabold">
                   🪪 Farmer PVC Card Designer
                 </h1>
@@ -1404,18 +1071,6 @@ export default function NewCardDesignerPage() {
                 <p className="text-slate-500">
                   Card ಅನ್ನು ನಿಮ್ಮ ಇಷ್ಟದಂತೆ design ಮಾಡಿ
                 </p>
-
-                <div className="mt-2 text-sm">
-                  <b>Member:</b>{" "}
-                  {member.name || "-"}
-                  {"  "}
-                  <span className="text-slate-500">
-                    Membership No:{" "}
-                    {member.membership_no ||
-                      "-"}
-                  </span>
-                </div>
-
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1448,9 +1103,7 @@ export default function NewCardDesignerPage() {
 
                 {!locked && (
                   <button
-                    onClick={
-                      resetDesign
-                    }
+                    onClick={resetDesign}
                     className="px-5 py-2 rounded-lg bg-red-100 text-red-700 font-bold"
                   >
                     Reset
@@ -1461,7 +1114,7 @@ export default function NewCardDesignerPage() {
 
             </div>
 
-            {/* TEMPLATE STATUS */}
+            {/* STATUS */}
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
 
@@ -1482,9 +1135,7 @@ export default function NewCardDesignerPage() {
                 {!locked && (
                   <>
                     <button
-                      onClick={
-                        addText
-                      }
+                      onClick={addText}
                       className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold"
                     >
                       ➕ Add Text
@@ -1496,9 +1147,7 @@ export default function NewCardDesignerPage() {
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={
-                          addImage
-                        }
+                        onChange={addImage}
                         className="hidden"
                       />
                     </label>
@@ -1507,9 +1156,7 @@ export default function NewCardDesignerPage() {
                       onClick={
                         saveTemplate
                       }
-                      disabled={
-                        saving
-                      }
+                      disabled={saving}
                       className="px-4 py-2 rounded-lg bg-green-700 text-white font-bold disabled:opacity-50"
                     >
                       {saving
@@ -1521,9 +1168,7 @@ export default function NewCardDesignerPage() {
                       onClick={
                         lockTemplate
                       }
-                      disabled={
-                        saving
-                      }
+                      disabled={saving}
                       className="px-4 py-2 rounded-lg bg-slate-900 text-white font-bold disabled:opacity-50"
                     >
                       🔒 Lock Template
@@ -1536,9 +1181,7 @@ export default function NewCardDesignerPage() {
                     onClick={
                       unlockTemplate
                     }
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                     className="px-5 py-2 rounded-lg bg-orange-600 text-white font-bold"
                   >
                     🔓 Unlock Template
@@ -1546,110 +1189,10 @@ export default function NewCardDesignerPage() {
                 )}
 
               </div>
-
             </div>
-
           </div>
 
-          {/* MEMBER INFO */}
-
-          <div className="bg-white rounded-2xl shadow p-4 mb-5">
-
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-sm">
-
-              <div>
-                <div className="text-slate-500">
-                  Name
-                </div>
-
-                <div className="font-bold">
-                  {member.name ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Membership
-                </div>
-
-                <div className="font-bold">
-                  {member.membership_no ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Village
-                </div>
-
-                <div className="font-bold">
-                  {member.village ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Taluk
-                </div>
-
-                <div className="font-bold">
-                  {member.taluk ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  District
-                </div>
-
-                <div className="font-bold">
-                  {member.district ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Mobile
-                </div>
-
-                <div className="font-bold">
-                  {member.mobile ||
-                    "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Valid From
-                </div>
-
-                <div className="font-bold text-green-700">
-                  {formatDate(
-                    member.valid_from
-                  ) || "-"}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-slate-500">
-                  Valid Till
-                </div>
-
-                <div className="font-bold text-green-700">
-                  {formatDate(
-                    member.valid_until
-                  ) || "-"}
-                </div>
-              </div>
-
-            </div>
-
-          </div>
+          {/* MAIN GRID */}
 
           <div className="grid lg:grid-cols-[1fr_340px] gap-5">
 
@@ -1669,12 +1212,9 @@ export default function NewCardDesignerPage() {
                   ref={cardRef}
                   className="relative overflow-hidden select-none shadow-2xl"
                   style={{
-                    width:
-                      CARD_WIDTH,
-                    height:
-                      CARD_HEIGHT,
-                    minWidth:
-                      CARD_WIDTH,
+                    width: CARD_WIDTH,
+                    height: CARD_HEIGHT,
+                    minWidth: CARD_WIDTH,
 
                     background:
                       "linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%)",
@@ -1682,11 +1222,9 @@ export default function NewCardDesignerPage() {
                     border:
                       "4px solid #075c2b",
 
-                    borderRadius:
-                      22,
+                    borderRadius: 22,
 
-                    touchAction:
-                      "none",
+                    touchAction: "none",
                   }}
                 >
 
@@ -1705,7 +1243,7 @@ export default function NewCardDesignerPage() {
                     }}
                   />
 
-                  {/* BACKGROUND */}
+                  {/* BOTTOM BACKGROUND */}
 
                   <div
                     className="absolute left-0 right-0 bottom-0 pointer-events-none"
@@ -1770,8 +1308,7 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex:
-                                30,
+                              zIndex: 30,
 
                               touchAction:
                                 "none",
@@ -1853,8 +1390,7 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex:
-                                40,
+                              zIndex: 40,
 
                               touchAction:
                                 "none",
@@ -1878,7 +1414,7 @@ export default function NewCardDesignerPage() {
                         );
                       }
 
-                      /* STATIC IMAGE */
+                      /* IMAGE */
 
                       if (
                         element.kind ===
@@ -1927,8 +1463,7 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex:
-                                25,
+                              zIndex: 25,
 
                               touchAction:
                                 "none",
@@ -2023,16 +1558,13 @@ export default function NewCardDesignerPage() {
                               "none",
                           }}
                         >
-                          {getElementText(
-                            element
-                          )}
+                          {element.text}
                         </div>
                       );
                     }
                   )}
 
                 </div>
-
               </div>
 
               <p className="text-center text-sm text-slate-500 mt-4">
@@ -2062,21 +1594,12 @@ export default function NewCardDesignerPage() {
                 <input
                   type="file"
                   accept="image/*"
-                  disabled={
-                    locked
-                  }
+                  disabled={locked}
                   onChange={
                     uploadMemberPhoto
                   }
                   className="w-full text-sm"
                 />
-
-                {member.photo_url &&
-                  !memberPhoto && (
-                    <p className="text-xs text-slate-500 mt-2">
-                      Member photo databaseನಲ್ಲಿ ಇದೆ.
-                    </p>
-                  )}
 
               </div>
 
@@ -2090,12 +1613,9 @@ export default function NewCardDesignerPage() {
 
                 <select
                   value={
-                    selectedId ||
-                    ""
+                    selectedId || ""
                   }
-                  disabled={
-                    locked
-                  }
+                  disabled={locked}
                   onChange={(e) =>
                     setSelectedId(
                       e.target.value
@@ -2103,6 +1623,7 @@ export default function NewCardDesignerPage() {
                   }
                   className="w-full border rounded-lg px-3 py-2"
                 >
+
                   <option value="">
                     Select field
                   </option>
@@ -2110,13 +1631,10 @@ export default function NewCardDesignerPage() {
                   {elements
                     .filter(
                       (e) =>
-                        e.side ===
-                        side
+                        e.side === side
                     )
                     .map(
-                      (
-                        element
-                      ) => (
+                      (element) => (
                         <option
                           key={
                             element.id
@@ -2151,9 +1669,7 @@ export default function NewCardDesignerPage() {
                       value={
                         selected.label
                       }
-                      disabled={
-                        locked
-                      }
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -2202,9 +1718,7 @@ export default function NewCardDesignerPage() {
                               }
                             )
                           }
-                          rows={
-                            3
-                          }
+                          rows={3}
                           className="w-full border rounded-lg p-2"
                         />
 
@@ -2254,7 +1768,7 @@ export default function NewCardDesignerPage() {
                       </div>
                     )}
 
-                  {/* FONT COLOR */}
+                  {/* COLOR */}
 
                   {selected.kind !==
                     "photo" &&
@@ -2283,7 +1797,8 @@ export default function NewCardDesignerPage() {
                               selected.id,
                               {
                                 color:
-                                  e.target
+                                  e
+                                    .target
                                     .value,
                               }
                             )
@@ -2307,9 +1822,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.x
                       )}
-                      disabled={
-                        locked
-                      }
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -2339,9 +1852,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.y
                       )}
-                      disabled={
-                        locked
-                      }
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -2371,9 +1882,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.width
                       )}
-                      disabled={
-                        locked
-                      }
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -2404,9 +1913,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.height
                       )}
-                      disabled={
-                        locked
-                      }
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -2445,10 +1952,39 @@ export default function NewCardDesignerPage() {
             </aside>
 
           </div>
-
         </div>
-
       </main>
     </AdminGuard>
+  );
+}
+
+/*
+==================================================
+IMPORTANT:
+Next.js build fix
+==================================================
+*/
+
+export default function NewCardDesignerPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="bg-white rounded-2xl shadow p-8 text-center">
+
+            <div className="text-3xl mb-3">
+              ⏳
+            </div>
+
+            <div className="font-bold">
+              Card Loading...
+            </div>
+
+          </div>
+        </main>
+      }
+    >
+      <NewCardDesignerPageContent />
+    </Suspense>
   );
 }
