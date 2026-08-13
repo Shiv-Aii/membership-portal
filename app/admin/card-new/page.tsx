@@ -1395,24 +1395,28 @@ function NewCardDesignerPageContent() {
       (element) => element.side === printSide
     );
 
+    // The editor uses an 856 × 539 coordinate system.
+    // For a CR80 card (85.6 × 53.9 mm), 1 editor px = 0.1 mm.
+    const pxToMm = (value: number) => `${value / 10}mm`;
+
     const elementHtml = sideElements
       .map((element) => {
         const commonStyle = [
           "position:absolute",
-          `left:${element.x}px`,
-          `top:${element.y}px`,
-          `width:${element.width}px`,
-          `height:${element.height}px`,
-          `font-size:${element.fontSize}px`,
+          `left:${pxToMm(element.x)}`,
+          `top:${pxToMm(element.y)}`,
+          `width:${pxToMm(element.width)}`,
+          `height:${pxToMm(element.height)}`,
+          `font-size:${pxToMm(element.fontSize)}`,
           `font-weight:${element.fontWeight}`,
           `color:${element.color}`,
           `background:${element.background}`,
-          `border-radius:${element.borderRadius || 0}px`,
+          `border-radius:${pxToMm(element.borderRadius || 0)}`,
           "box-sizing:border-box",
           "overflow:hidden",
           `z-index:${element.kind === "footer" ? 50 : 60}`,
           element.background !== "transparent"
-            ? "padding:6px"
+            ? `padding:${pxToMm(6)}`
             : "padding:0",
           "font-family:Arial,'Noto Sans Kannada','Noto Sans',sans-serif",
           "line-height:1.2",
@@ -1420,11 +1424,11 @@ function NewCardDesignerPageContent() {
 
         if (element.kind === "photo") {
           return `
-            <div style="${commonStyle};border:4px solid #166534;background:#fff;">
+            <div style="${commonStyle};border:${pxToMm(4)} solid #166534;background:#fff;">
               ${
                 memberPhoto
                   ? `<img src="${escapePrintHtml(memberPhoto)}" alt="Member Photo" style="width:100%;height:100%;object-fit:cover;display:block;" />`
-                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;">👤</div>`
+                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:${pxToMm(42)};">👤</div>`
               }
             </div>
           `;
@@ -1432,7 +1436,7 @@ function NewCardDesignerPageContent() {
 
         if (element.kind === "qr") {
           return `
-            <div style="${commonStyle};border:4px solid #166534;background:#fff;padding:8px;">
+            <div style="${commonStyle};border:${pxToMm(4)} solid #166534;background:#fff;padding:${pxToMm(8)};">
               ${
                 qrImage
                   ? `<img src="${escapePrintHtml(qrImage)}" alt="QR Code" style="width:100%;height:100%;display:block;object-fit:contain;" />`
@@ -1478,15 +1482,11 @@ function NewCardDesignerPageContent() {
     if (typeof window === "undefined") return;
 
     /*
-     * IMPORTANT:
-     * Do NOT use window.open() here.
-     * Chrome/Android can block it as a popup even when the button
-     * click is valid. Instead, create a temporary print-only container
-     * in the current document and let window.print() handle Save as PDF.
-     *
+     * PDF / Print output:
      * Page 1 = FRONT
      * Page 2 = BACK
-     * Size = 85.6mm × 53.9mm (CR80 PVC card)
+     * Each page is exactly CR80 PVC card size: 85.6 × 53.9 mm.
+     * No popup and no A4 layout are used.
      */
     document.getElementById("print-container")?.remove();
 
@@ -1499,7 +1499,6 @@ function NewCardDesignerPageContent() {
 
     document.body.appendChild(printContainer);
 
-    // Wait for all photos / QR / uploaded images.
     const images = Array.from(
       printContainer.querySelectorAll("img")
     );
@@ -1522,7 +1521,6 @@ function NewCardDesignerPageContent() {
       } catch {}
     }
 
-    // Give the browser two layout frames before opening Print Preview.
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => resolve());
@@ -1535,7 +1533,6 @@ function NewCardDesignerPageContent() {
     };
 
     window.addEventListener("afterprint", cleanup);
-
     window.print();
   }
 
@@ -1616,41 +1613,27 @@ function NewCardDesignerPageContent() {
           body {
             margin: 0 !important;
             padding: 0 !important;
+            width: 85.6mm !important;
+            min-width: 85.6mm !important;
+            max-width: 85.6mm !important;
             background: #ffffff !important;
           }
 
-          /* Print ONLY the dedicated two-card container.
-             Do not use visibility:hidden for the whole app because hidden
-             elements still participate in print layout and can create
-             extra blank pages. */
           body > *:not(#print-container) {
             display: none !important;
           }
 
-          html,
-          body {
-            width: 85.6mm !important;
-            min-width: 85.6mm !important;
-            max-width: 85.6mm !important;
-          }
-
-          #print-container,
-          #print-container * {
-            visibility: visible !important;
-          }
-
           #print-container {
             display: block !important;
-            position: static !important;
             width: 85.6mm !important;
-            height: 107.8mm !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
           }
 
-          #print-container .print-card-page,
-          #print-container .print-card-inner {
+          #print-container,
+          #print-container * {
+            visibility: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -1664,24 +1647,14 @@ function NewCardDesignerPageContent() {
             min-height: 53.9mm !important;
             max-width: 85.6mm !important;
             max-height: 53.9mm !important;
-            overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: hidden !important;
             box-sizing: border-box !important;
-            page-break-before: auto !important;
             page-break-after: always !important;
-            break-before: auto !important;
             break-after: page !important;
-          }
-
-          #print-container .print-card-inner > * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          #print-container .print-card-page + .print-card-page {
-            page-break-before: always !important;
-            break-before: page !important;
+            page-break-before: auto !important;
+            break-before: auto !important;
           }
 
           #print-container .print-card-page:last-child {
@@ -1689,31 +1662,19 @@ function NewCardDesignerPageContent() {
             break-after: auto !important;
           }
 
-          .print-card-inner {
+          #print-container .print-card-inner {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 856px !important;
-            height: 539px !important;
-
-            /*
-             * The editor card is 856x539 CSS px.
-             * 85.6x53.9mm at 96dpi is about 323x204 CSS px,
-             * so scale the complete card by 85.6/226.48.
-             * transform is used instead of zoom because it is much
-             * more reliable in Chrome/Android Print -> Save as PDF.
-             */
-            transform: scale(0.3779527559) !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            transform: none !important;
             transform-origin: top left !important;
-
             overflow: hidden !important;
             box-sizing: border-box !important;
-            border: 4px solid #075c2b !important;
-            border-radius: 22px !important;
+            border: 0.4mm solid #075c2b !important;
+            border-radius: 2.2mm !important;
             background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
-
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
           }
 
           .print-card-background {
@@ -1727,9 +1688,9 @@ function NewCardDesignerPageContent() {
             left: 0 !important;
             right: 0 !important;
             top: 0 !important;
-            height: 115px !important;
+            height: 11.5mm !important;
             background: linear-gradient(135deg,#ffffff,#f6fff8) !important;
-            border-bottom: 10px solid #075c2b !important;
+            border-bottom: 1mm solid #075c2b !important;
           }
 
           .print-card-bottom {
@@ -1737,7 +1698,7 @@ function NewCardDesignerPageContent() {
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
-            height: 150px !important;
+            height: 15mm !important;
             background: linear-gradient(to top,#d8efc8,transparent) !important;
             opacity: 0.55 !important;
           }
