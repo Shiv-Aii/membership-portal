@@ -828,17 +828,43 @@ function NewCardDesignerPageContent() {
           memberId || "MEMBERSHIP_NUMBER"
         );
 
+        /*
+         * QR must identify THIS member.
+         * Send all common identifiers so the existing /verify page
+         * can use whichever parameter it already reads.
+         */
+        if (!memberId && !membershipNumber) {
+          setQrImage("");
+          return;
+        }
+
+        const params = new URLSearchParams();
+
+        if (memberId) {
+          params.set("id", memberId);
+          params.set("member_id", memberId);
+          params.set("application_id", memberId);
+        }
+
+        if (
+          membershipNumber &&
+          membershipNumber !== "MEMBERSHIP_NUMBER"
+        ) {
+          params.set("membership", membershipNumber);
+        }
+
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?membership=${encodeURIComponent(membershipNumber)}`
-            : `https://example.com/verify?membership=${encodeURIComponent(membershipNumber)}`;
+            ? `${window.location.origin}/verify?${params.toString()}`
+            : `/verify?${params.toString()}`;
 
         const image =
           await QRCode.toDataURL(
             url,
             {
-              width: 300,
+              width: 500,
               margin: 1,
+              errorCorrectionLevel: "H",
               color: {
                 dark: "#075c2b",
                 light: "#ffffff",
@@ -1604,6 +1630,12 @@ function NewCardDesignerPageContent() {
             overflow: visible !important;
           }
 
+          #print-container .print-card-page,
+          #print-container .print-card-inner {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
           #print-container .print-card-page {
             display: block !important;
             position: relative !important;
@@ -1623,6 +1655,11 @@ function NewCardDesignerPageContent() {
             break-after: page !important;
           }
 
+          #print-container .print-card-inner > * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
           #print-container .print-card-page + .print-card-page {
             page-break-before: always !important;
             break-before: page !important;
@@ -1639,16 +1676,25 @@ function NewCardDesignerPageContent() {
             top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            /* Use zoom for print layout so the complete 856x539 editor
-               card is laid out as one 85.6x53.9mm physical card. */
-            zoom: 0.3779527559 !important;
-            transform: none !important;
+
+            /*
+             * The editor card is 856x539 CSS px.
+             * 85.6x53.9mm at 96dpi is about 323x204 CSS px,
+             * so scale the complete card by 85.6/226.48.
+             * transform is used instead of zoom because it is much
+             * more reliable in Chrome/Android Print -> Save as PDF.
+             */
+            transform: scale(0.3779527559) !important;
             transform-origin: top left !important;
+
             overflow: hidden !important;
             box-sizing: border-box !important;
             border: 4px solid #075c2b !important;
             border-radius: 22px !important;
             background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
+
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
           .print-card-background {
