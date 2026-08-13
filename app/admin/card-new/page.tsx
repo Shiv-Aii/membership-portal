@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import AdminGuard from "@/components/AdminGuard";
+import { supabase } from "@/lib/supabase";
 
 type Side = "front" | "back";
 
@@ -10,6 +11,7 @@ type ElementKind =
   | "text"
   | "photo"
   | "qr"
+  | "image"
   | "footer";
 
 type CardElement = {
@@ -30,10 +32,13 @@ type CardElement = {
   background: string;
 
   borderRadius?: number;
+  src?: string;
 };
 
 const CARD_WIDTH = 856;
 const CARD_HEIGHT = 539;
+
+const TEMPLATE_NAME = "Farmer PVC Card";
 
 const initialElements: CardElement[] = [
   {
@@ -51,10 +56,9 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
-
   {
     id: "org-en",
-    label: "Organization English Name",
+    label: "English Organization Name",
     kind: "text",
     text: "KARNATAKA RAJYA RAITHA SANGH & GREEN BRIGADE",
     side: "front",
@@ -67,7 +71,6 @@ const initialElements: CardElement[] = [
     color: "#087332",
     background: "transparent",
   },
-
   {
     id: "reg",
     label: "Registration Number",
@@ -83,7 +86,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "name",
     label: "ಹೆಸರು",
@@ -99,12 +101,11 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "membership",
     label: "Membership Number",
     kind: "text",
-    text: "KRRS/2026/000001",
+    text: "Membership Number",
     side: "front",
     x: 300,
     y: 200,
@@ -115,7 +116,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "village",
     label: "ಗ್ರಾಮ",
@@ -131,7 +131,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "taluk",
     label: "ತಾಲ್ಲೂಕು",
@@ -147,7 +146,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "district",
     label: "ಜಿಲ್ಲೆ",
@@ -163,7 +161,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "mobile",
     label: "ಮೊಬೈಲ್",
@@ -179,7 +176,6 @@ const initialElements: CardElement[] = [
     color: "#111111",
     background: "transparent",
   },
-
   {
     id: "valid-from",
     label: "Valid From",
@@ -195,7 +191,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
-
   {
     id: "valid-till",
     label: "Valid Till",
@@ -211,7 +206,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
-
   {
     id: "front-photo",
     label: "Member Photo",
@@ -228,7 +222,6 @@ const initialElements: CardElement[] = [
     background: "#ffffff",
     borderRadius: 12,
   },
-
   {
     id: "front-qr",
     label: "QR Code",
@@ -245,9 +238,6 @@ const initialElements: CardElement[] = [
     background: "#ffffff",
     borderRadius: 12,
   },
-
-  /* BACK */
-
   {
     id: "back-title",
     label: "Back Heading",
@@ -263,7 +253,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "transparent",
   },
-
   {
     id: "back-note",
     label: "Back Information",
@@ -279,7 +268,6 @@ const initialElements: CardElement[] = [
     color: "#222222",
     background: "transparent",
   },
-
   {
     id: "back-valid-from",
     label: "Back Valid From",
@@ -295,7 +283,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
-
   {
     id: "back-valid-till",
     label: "Back Valid Till",
@@ -311,24 +298,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
   },
-
-  {
-    id: "back-footer",
-    label: "Footer Heading",
-    kind: "footer",
-    text: "🌱 ರೈತರು ನಮ್ಮ ಹೆಮ್ಮೆ | 🚜 ರೈತ ಬೆಳೆ — ದೇಶದ ಬೆಳೆ | 🌾 ರೈತರಿಗೆ ನಮ್ಮ ಶಕ್ತಿ",
-    side: "back",
-    x: 45,
-    y: 475,
-    width: 766,
-    height: 45,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#ffffff",
-    background: "#075c2b",
-    borderRadius: 8,
-  },
-
   {
     id: "front-footer",
     label: "Front Footer",
@@ -345,26 +314,107 @@ const initialElements: CardElement[] = [
     background: "#075c2b",
     borderRadius: 8,
   },
+  {
+    id: "back-footer",
+    label: "Back Footer",
+    kind: "footer",
+    text: "🌱 ರೈತರು ನಮ್ಮ ಹೆಮ್ಮೆ | 🚜 ರೈತ ಬೆಳೆ — ದೇಶದ ಬೆಳೆ",
+    side: "back",
+    x: 45,
+    y: 475,
+    width: 766,
+    height: 45,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#ffffff",
+    background: "#075c2b",
+    borderRadius: 8,
+  },
 ];
 
+function cloneElements(elements: CardElement[]) {
+  return elements.map((e) => ({ ...e }));
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resolve(String(reader.result));
+    };
+
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function NewCardDesignerPage() {
-  const [elements, setElements] =
-    useState<CardElement[]>(initialElements);
+  const [elements, setElements] = useState<CardElement[]>(
+    cloneElements(initialElements)
+  );
 
-  const [side, setSide] =
-    useState<Side>("front");
+  const [side, setSide] = useState<Side>("front");
 
-  const [selectedId, setSelectedId] =
-    useState<string | null>("name");
+  const [selectedId, setSelectedId] = useState<string | null>("name");
 
-  const [photo, setPhoto] =
-    useState<string | null>(null);
+  const [memberPhoto, setMemberPhoto] = useState<string | null>(null);
 
-  const [qrImage, setQrImage] =
-    useState("");
+  const [qrImage, setQrImage] = useState("");
 
-  const cardRef =
-    useRef<HTMLDivElement>(null);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+
+  const [locked, setLocked] = useState(false);
+
+  const [loadingTemplate, setLoadingTemplate] = useState(true);
+
+  const [saving, setSaving] = useState(false);
+
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  /* =========================
+     LOAD TEMPLATE
+  ========================= */
+
+  useEffect(() => {
+    async function loadTemplate() {
+      setLoadingTemplate(true);
+
+      const { data, error } = await supabase
+        .from("card_templates")
+        .select("id, name, design, is_locked")
+        .eq("name", TEMPLATE_NAME)
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Template load error:", error);
+        setLoadingTemplate(false);
+        return;
+      }
+
+      if (data) {
+        setTemplateId(data.id);
+        setLocked(Boolean(data.is_locked));
+
+        const design = data.design as any;
+
+        if (
+          design &&
+          Array.isArray(design.elements) &&
+          design.elements.length > 0
+        ) {
+          setElements(design.elements);
+        }
+      }
+
+      setLoadingTemplate(false);
+    }
+
+    loadTemplate();
+  }, []);
 
   /* =========================
      QR
@@ -375,20 +425,19 @@ export default function NewCardDesignerPage() {
       try {
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?membership=KRRS-2026-000001`
+            ? `${window.location.origin}/verify?membership=MEMBERSHIP_NUMBER`
             : "https://example.com/verify";
 
-        const dataUrl =
-          await QRCode.toDataURL(url, {
-            width: 300,
-            margin: 1,
-            color: {
-              dark: "#075c2b",
-              light: "#ffffff",
-            },
-          });
+        const image = await QRCode.toDataURL(url, {
+          width: 300,
+          margin: 1,
+          color: {
+            dark: "#075c2b",
+            light: "#ffffff",
+          },
+        });
 
-        setQrImage(dataUrl);
+        setQrImage(image);
       } catch (error) {
         console.error(error);
       }
@@ -405,16 +454,29 @@ export default function NewCardDesignerPage() {
     id: string,
     changes: Partial<CardElement>
   ) {
+    if (locked) return;
+
     setElements((current) =>
       current.map((element) =>
         element.id === id
-          ? {
-              ...element,
-              ...changes,
-            }
+          ? { ...element, ...changes }
           : element
       )
     );
+  }
+
+  /* =========================
+     DELETE
+  ========================= */
+
+  function deleteElement(id: string) {
+    if (locked) return;
+
+    setElements((current) =>
+      current.filter((element) => element.id !== id)
+    );
+
+    setSelectedId(null);
   }
 
   /* =========================
@@ -425,125 +487,330 @@ export default function NewCardDesignerPage() {
     event: React.PointerEvent,
     element: CardElement
   ) {
+    if (locked) return;
+
     event.preventDefault();
     event.stopPropagation();
 
     setSelectedId(element.id);
 
-    const startX =
-      event.clientX;
+    const startX = event.clientX;
+    const startY = event.clientY;
 
-    const startY =
-      event.clientY;
+    const originalX = element.x;
+    const originalY = element.y;
 
-    const originalX =
-      element.x;
-
-    const originalY =
-      element.y;
-
-    const rect =
-      cardRef.current?.getBoundingClientRect();
+    const rect = cardRef.current?.getBoundingClientRect();
 
     if (!rect) return;
 
     function move(e: PointerEvent) {
-      const scaleX =
-        rect!.width /
-        CARD_WIDTH;
+      const scaleX = rect!.width / CARD_WIDTH;
+      const scaleY = rect!.height / CARD_HEIGHT;
 
-      const scaleY =
-        rect!.height /
-        CARD_HEIGHT;
+      const dx = (e.clientX - startX) / scaleX;
+      const dy = (e.clientY - startY) / scaleY;
 
-      const dx =
-        (e.clientX - startX) /
-        scaleX;
-
-      const dy =
-        (e.clientY - startY) /
-        scaleY;
-
-      updateElement(
-        element.id,
-        {
-          x: Math.max(
-            0,
-            Math.min(
-              CARD_WIDTH -
-                element.width,
-              originalX + dx
-            )
-          ),
-
-          y: Math.max(
-            0,
-            Math.min(
-              CARD_HEIGHT -
-                element.height,
-              originalY + dy
-            )
-          ),
-        }
-      );
+      updateElement(element.id, {
+        x: Math.max(
+          0,
+          Math.min(
+            CARD_WIDTH - element.width,
+            originalX + dx
+          )
+        ),
+        y: Math.max(
+          0,
+          Math.min(
+            CARD_HEIGHT - element.height,
+            originalY + dy
+          )
+        ),
+      });
     }
 
     function up() {
-      window.removeEventListener(
-        "pointermove",
-        move
-      );
-
-      window.removeEventListener(
-        "pointerup",
-        up
-      );
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
     }
 
-    window.addEventListener(
-      "pointermove",
-      move
-    );
-
-    window.addEventListener(
-      "pointerup",
-      up
-    );
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   /* =========================
-     PHOTO
+     ADD TEXT
   ========================= */
 
-  function handlePhoto(
+  function addText() {
+    if (locked) return;
+
+    const newElement: CardElement = {
+      id: `text-${Date.now()}`,
+      label: "New Text",
+      kind: "text",
+      text: "ಹೊಸ Text",
+      side,
+      x: 250,
+      y: 250,
+      width: 300,
+      height: 45,
+      fontSize: 20,
+      fontWeight: "600",
+      color: "#111111",
+      background: "transparent",
+    };
+
+    setElements((current) => [
+      ...current,
+      newElement,
+    ]);
+
+    setSelectedId(newElement.id);
+  }
+
+  /* =========================
+     ADD IMAGE
+  ========================= */
+
+  async function addImage(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
-    const file =
-      event.target.files?.[0];
+    if (locked) return;
+
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
-    const url =
-      URL.createObjectURL(file);
+    try {
+      const dataUrl = await fileToDataUrl(file);
 
-    setPhoto(url);
+      const newElement: CardElement = {
+        id: `image-${Date.now()}`,
+        label: "New Image",
+        kind: "image",
+        text: "",
+        side,
+        x: 250,
+        y: 180,
+        width: 180,
+        height: 120,
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#111111",
+        background: "#ffffff",
+        borderRadius: 10,
+        src: dataUrl,
+      };
+
+      setElements((current) => [
+        ...current,
+        newElement,
+      ]);
+
+      setSelectedId(newElement.id);
+    } catch (error) {
+      console.error(error);
+
+      alert("Image load ಆಗಲಿಲ್ಲ.");
+    }
+
+    event.target.value = "";
   }
 
   /* =========================
-     DELETE
+     MEMBER PHOTO
   ========================= */
 
-  function deleteElement(
-    id: string
+  async function uploadMemberPhoto(
+    event: React.ChangeEvent<HTMLInputElement>
   ) {
-    setElements((current) =>
-      current.filter(
-        (element) =>
-          element.id !== id
-      )
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+
+      setMemberPhoto(dataUrl);
+
+      const photoElement = elements.find(
+        (e) => e.kind === "photo"
+      );
+
+      if (photoElement) {
+        setSelectedId(photoElement.id);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
+    event.target.value = "";
+  }
+
+  /* =========================
+     SAVE TEMPLATE
+  ========================= */
+
+  async function saveTemplate() {
+    if (locked) {
+      alert(
+        "🔒 Template locked ಇದೆ. ಮೊದಲು Unlock ಮಾಡಿ."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    const design = {
+      version: 1,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
+      elements,
+    };
+
+    try {
+      if (templateId) {
+        const { error } = await supabase
+          .from("card_templates")
+          .update({
+            name: TEMPLATE_NAME,
+            design,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", templateId);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("card_templates")
+          .insert({
+            name: TEMPLATE_NAME,
+            design,
+            is_locked: false,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+
+        if (data?.id) {
+          setTemplateId(data.id);
+        }
+      }
+
+      alert("💾 Template Save ಆಯಿತು ✅");
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        "Template save ಆಗಲಿಲ್ಲ:\n\n" +
+          (error?.message || "Unknown error")
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* =========================
+     LOCK
+  ========================= */
+
+  async function lockTemplate() {
+    if (saving) return;
+
+    if (!templateId) {
+      alert(
+        "ಮೊದಲು 💾 Save Template ಮಾಡಿ."
+      );
+      return;
+    }
+
+    const ok = confirm(
+      "🔒 ಈ Card Design ಅನ್ನು Lock ಮಾಡಬೇಕೇ?\n\nLock ಮಾಡಿದ ನಂತರ Text / Image / Position ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ."
     );
 
-    setSelectedId(null);
+    if (!ok) return;
+
+    setSaving(true);
+
+    try {
+      const design = {
+        version: 1,
+        cardWidth: CARD_WIDTH,
+        cardHeight: CARD_HEIGHT,
+        elements,
+      };
+
+      const { error } = await supabase
+        .from("card_templates")
+        .update({
+          design,
+          is_locked: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", templateId);
+
+      if (error) throw error;
+
+      setLocked(true);
+
+      alert(
+        "🔒 Card Template Locked Successfully ✅"
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        "Lock ಆಗಲಿಲ್ಲ:\n\n" +
+          (error?.message || "Unknown error")
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* =========================
+     UNLOCK
+  ========================= */
+
+  async function unlockTemplate() {
+    if (!templateId) return;
+
+    const ok = confirm(
+      "🔓 Template Unlock ಮಾಡಬೇಕೇ?"
+    );
+
+    if (!ok) return;
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("card_templates")
+        .update({
+          is_locked: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", templateId);
+
+      if (error) throw error;
+
+      setLocked(false);
+
+      alert(
+        "🔓 Template Unlocked ✅"
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        "Unlock ಆಗಲಿಲ್ಲ:\n\n" +
+          (error?.message || "Unknown error")
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   /* =========================
@@ -551,12 +818,16 @@ export default function NewCardDesignerPage() {
   ========================= */
 
   function resetDesign() {
+    if (locked) return;
+
+    const ok = confirm(
+      "Current design reset ಮಾಡಬೇಕೇ?"
+    );
+
+    if (!ok) return;
+
     setElements(
-      initialElements.map(
-        (element) => ({
-          ...element,
-        })
-      )
+      cloneElements(initialElements)
     );
 
     setSelectedId(null);
@@ -565,8 +836,7 @@ export default function NewCardDesignerPage() {
 
   const visibleElements =
     elements.filter(
-      (element) =>
-        element.side === side
+      (element) => element.side === side
     );
 
   const selected =
@@ -574,6 +844,23 @@ export default function NewCardDesignerPage() {
       (element) =>
         element.id === selectedId
     ) || null;
+
+  if (loadingTemplate) {
+    return (
+      <AdminGuard>
+        <main className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="bg-white rounded-2xl shadow p-8 text-center">
+            <div className="text-3xl mb-3">
+              ⏳
+            </div>
+            <div className="font-bold">
+              Card Template Loading...
+            </div>
+          </div>
+        </main>
+      </AdminGuard>
+    );
+  }
 
   return (
     <AdminGuard>
@@ -583,60 +870,137 @@ export default function NewCardDesignerPage() {
 
           {/* HEADER */}
 
-          <div className="bg-white rounded-2xl shadow p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white rounded-2xl shadow p-4 mb-5">
 
-            <div>
-              <h1 className="text-2xl font-extrabold">
-                🪪 Farmer PVC Card Designer
-              </h1>
+            <div className="flex flex-wrap items-center justify-between gap-4">
 
-              <p className="text-slate-500">
-                ಪ್ರತಿಯೊಂದು information ಅನ್ನು drag & edit ಮಾಡಬಹುದು
-              </p>
+              <div>
+                <h1 className="text-2xl font-extrabold">
+                  🪪 Farmer PVC Card Designer
+                </h1>
+
+                <p className="text-slate-500">
+                  Card ಅನ್ನು ನಿಮ್ಮ ಇಷ್ಟದಂತೆ design ಮಾಡಿ
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+
+                <button
+                  onClick={() =>
+                    setSide("front")
+                  }
+                  className={`px-5 py-2 rounded-lg font-bold ${
+                    side === "front"
+                      ? "bg-green-700 text-white"
+                      : "bg-slate-200"
+                  }`}
+                >
+                  FRONT
+                </button>
+
+                <button
+                  onClick={() =>
+                    setSide("back")
+                  }
+                  className={`px-5 py-2 rounded-lg font-bold ${
+                    side === "back"
+                      ? "bg-green-700 text-white"
+                      : "bg-slate-200"
+                  }`}
+                >
+                  BACK
+                </button>
+
+                {!locked && (
+                  <button
+                    onClick={resetDesign}
+                    className="px-5 py-2 rounded-lg bg-red-100 text-red-700 font-bold"
+                  >
+                    Reset
+                  </button>
+                )}
+
+              </div>
+
             </div>
 
-            <div className="flex gap-2 flex-wrap">
+            {/* TEMPLATE STATUS */}
 
-              <button
-                onClick={() =>
-                  setSide("front")
-                }
-                className={`px-5 py-2 rounded-lg font-bold ${
-                  side === "front"
-                    ? "bg-green-700 text-white"
-                    : "bg-slate-200"
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+
+              <div
+                className={`px-4 py-2 rounded-lg font-bold ${
+                  locked
+                    ? "bg-red-100 text-red-700"
+                    : "bg-green-100 text-green-700"
                 }`}
               >
-                FRONT
-              </button>
+                {locked
+                  ? "🔒 TEMPLATE LOCKED"
+                  : "🟢 TEMPLATE EDITABLE"}
+              </div>
 
-              <button
-                onClick={() =>
-                  setSide("back")
-                }
-                className={`px-5 py-2 rounded-lg font-bold ${
-                  side === "back"
-                    ? "bg-green-700 text-white"
-                    : "bg-slate-200"
-                }`}
-              >
-                BACK
-              </button>
+              <div className="flex flex-wrap gap-2">
 
-              <button
-                onClick={resetDesign}
-                className="px-5 py-2 rounded-lg bg-red-100 text-red-700 font-bold"
-              >
-                Reset
-              </button>
+                {!locked && (
+                  <>
+                    <button
+                      onClick={addText}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold"
+                    >
+                      ➕ Add Text
+                    </button>
+
+                    <label className="px-4 py-2 rounded-lg bg-purple-600 text-white font-bold cursor-pointer">
+                      🖼️ Add Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={addImage}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <button
+                      onClick={saveTemplate}
+                      disabled={saving}
+                      className="px-4 py-2 rounded-lg bg-green-700 text-white font-bold disabled:opacity-50"
+                    >
+                      {saving
+                        ? "Saving..."
+                        : "💾 Save Template"}
+                    </button>
+
+                    <button
+                      onClick={lockTemplate}
+                      disabled={saving}
+                      className="px-4 py-2 rounded-lg bg-slate-900 text-white font-bold disabled:opacity-50"
+                    >
+                      🔒 Lock Template
+                    </button>
+                  </>
+                )}
+
+                {locked && (
+                  <button
+                    onClick={unlockTemplate}
+                    disabled={saving}
+                    className="px-5 py-2 rounded-lg bg-orange-600 text-white font-bold"
+                  >
+                    🔓 Unlock Template
+                  </button>
+                )}
+
+              </div>
 
             </div>
 
           </div>
 
-          <div className="grid lg:grid-cols-[1fr_330px] gap-5">
+          <div className="grid lg:grid-cols-[1fr_340px] gap-5">
 
-            {/* CARD */}
+            {/* CARD AREA */}
 
             <section className="bg-slate-200 rounded-2xl p-4 md:p-8 overflow-auto">
 
@@ -664,7 +1028,7 @@ export default function NewCardDesignerPage() {
                   }}
                 >
 
-                  {/* TOP DESIGN */}
+                  {/* TOP */}
 
                   <div
                     className="absolute left-0 right-0 top-0 pointer-events-none"
@@ -677,7 +1041,7 @@ export default function NewCardDesignerPage() {
                     }}
                   />
 
-                  {/* FIELD BACKGROUND */}
+                  {/* BACKGROUND */}
 
                   <div
                     className="absolute left-0 right-0 bottom-0 pointer-events-none"
@@ -689,10 +1053,12 @@ export default function NewCardDesignerPage() {
                     }}
                   />
 
-                  {/* DRAGGABLE ELEMENTS */}
+                  {/* ELEMENTS */}
 
                   {visibleElements.map(
                     (element) => {
+
+                      /* PHOTO */
 
                       if (
                         element.kind ===
@@ -719,24 +1085,22 @@ export default function NewCardDesignerPage() {
                                 : ""
                             }`}
                             style={{
-                              left:
-                                element.x,
-                              top:
-                                element.y,
+                              left: element.x,
+                              top: element.y,
                               width:
                                 element.width,
                               height:
                                 element.height,
                               borderRadius:
                                 element.borderRadius,
-                              zIndex: 20,
+                              zIndex: 30,
                               touchAction:
                                 "none",
                             }}
                           >
-                            {photo ? (
+                            {memberPhoto ? (
                               <img
-                                src={photo}
+                                src={memberPhoto}
                                 alt="Member"
                                 draggable={false}
                                 className="w-full h-full object-cover pointer-events-none"
@@ -746,6 +1110,7 @@ export default function NewCardDesignerPage() {
                                 <div className="text-5xl">
                                   👤
                                 </div>
+
                                 <div className="font-bold">
                                   Member Photo
                                 </div>
@@ -754,6 +1119,8 @@ export default function NewCardDesignerPage() {
                           </div>
                         );
                       }
+
+                      /* QR */
 
                       if (
                         element.kind ===
@@ -780,17 +1147,15 @@ export default function NewCardDesignerPage() {
                                 : ""
                             }`}
                             style={{
-                              left:
-                                element.x,
-                              top:
-                                element.y,
+                              left: element.x,
+                              top: element.y,
                               width:
                                 element.width,
                               height:
                                 element.height,
                               borderRadius:
                                 element.borderRadius,
-                              zIndex: 30,
+                              zIndex: 40,
                               touchAction:
                                 "none",
                             }}
@@ -798,7 +1163,7 @@ export default function NewCardDesignerPage() {
                             {qrImage && (
                               <img
                                 src={qrImage}
-                                alt="QR Code"
+                                alt="QR"
                                 draggable={false}
                                 className="w-full h-full pointer-events-none"
                               />
@@ -806,6 +1171,62 @@ export default function NewCardDesignerPage() {
                           </div>
                         );
                       }
+
+                      /* STATIC IMAGE */
+
+                      if (
+                        element.kind ===
+                        "image"
+                      ) {
+                        return (
+                          <div
+                            key={element.id}
+                            onPointerDown={(e) =>
+                              handlePointerDown(
+                                e,
+                                element
+                              )
+                            }
+                            onClick={() =>
+                              setSelectedId(
+                                element.id
+                              )
+                            }
+                            className={`absolute cursor-move overflow-hidden ${
+                              selectedId ===
+                              element.id
+                                ? "ring-2 ring-blue-500"
+                                : ""
+                            }`}
+                            style={{
+                              left: element.x,
+                              top: element.y,
+                              width:
+                                element.width,
+                              height:
+                                element.height,
+                              background:
+                                element.background,
+                              borderRadius:
+                                element.borderRadius,
+                              zIndex: 25,
+                              touchAction:
+                                "none",
+                            }}
+                          >
+                            {element.src && (
+                              <img
+                                src={element.src}
+                                alt="Card"
+                                draggable={false}
+                                className="w-full h-full object-contain pointer-events-none"
+                              />
+                            )}
+                          </div>
+                        );
+                      }
+
+                      /* TEXT / FOOTER */
 
                       return (
                         <div
@@ -828,10 +1249,8 @@ export default function NewCardDesignerPage() {
                               : ""
                           }`}
                           style={{
-                            left:
-                              element.x,
-                            top:
-                              element.y,
+                            left: element.x,
+                            top: element.y,
                             width:
                               element.width,
                             height:
@@ -855,8 +1274,8 @@ export default function NewCardDesignerPage() {
                             zIndex:
                               element.kind ===
                               "footer"
-                                ? 40
-                                : 50,
+                                ? 50
+                                : 60,
                             touchAction:
                               "none",
                           }}
@@ -872,7 +1291,9 @@ export default function NewCardDesignerPage() {
               </div>
 
               <p className="text-center text-sm text-slate-500 mt-4">
-                💡 Photo / QR / Heading / Text ಮೇಲೆ press ಮಾಡಿ drag ಮಾಡಿ
+                {locked
+                  ? "🔒 Template locked — editing disabled"
+                  : "💡 Text / Image / Photo / QR ಮೇಲೆ press ಮಾಡಿ drag ಮಾಡಿ"}
               </p>
 
             </section>
@@ -882,10 +1303,10 @@ export default function NewCardDesignerPage() {
             <aside className="bg-white rounded-2xl shadow p-5 h-fit">
 
               <h2 className="text-xl font-extrabold mb-4">
-                ✏️ Edit Information
+                ✏️ Edit Selected
               </h2>
 
-              {/* PHOTO UPLOAD */}
+              {/* MEMBER PHOTO */}
 
               <div className="mb-5">
 
@@ -896,24 +1317,24 @@ export default function NewCardDesignerPage() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={handlePhoto}
+                  disabled={locked}
+                  onChange={uploadMemberPhoto}
                   className="w-full text-sm"
                 />
 
               </div>
 
-              {/* FIELD SELECT */}
+              {/* SELECT */}
 
               <div className="mb-5">
 
                 <label className="block font-bold mb-2">
-                  Select Field
+                  Select Element
                 </label>
 
                 <select
-                  value={
-                    selectedId || ""
-                  }
+                  value={selectedId || ""}
+                  disabled={locked}
                   onChange={(e) =>
                     setSelectedId(
                       e.target.value
@@ -921,7 +1342,6 @@ export default function NewCardDesignerPage() {
                   }
                   className="w-full border rounded-lg px-3 py-2"
                 >
-
                   <option value="">
                     Select field
                   </option>
@@ -934,14 +1354,11 @@ export default function NewCardDesignerPage() {
                     .map((element) => (
                       <option
                         key={element.id}
-                        value={
-                          element.id
-                        }
+                        value={element.id}
                       >
                         {element.label}
                       </option>
                     ))}
-
                 </select>
 
               </div>
@@ -949,12 +1366,40 @@ export default function NewCardDesignerPage() {
               {selected && (
                 <div className="space-y-4">
 
+                  {/* LABEL */}
+
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Field Name
+                    </label>
+
+                    <input
+                      value={
+                        selected.label
+                      }
+                      disabled={locked}
+                      onChange={(e) =>
+                        updateElement(
+                          selected.id,
+                          {
+                            label:
+                              e.target
+                                .value,
+                          }
+                        )
+                      }
+                      className="w-full border rounded-lg p-2"
+                    />
+                  </div>
+
                   {/* TEXT */}
 
                   {selected.kind !==
                     "photo" &&
                     selected.kind !==
-                      "qr" && (
+                      "qr" &&
+                    selected.kind !==
+                      "image" && (
                       <div>
                         <label className="block font-semibold mb-1">
                           Text
@@ -964,6 +1409,7 @@ export default function NewCardDesignerPage() {
                           value={
                             selected.text
                           }
+                          disabled={locked}
                           onChange={(e) =>
                             updateElement(
                               selected.id,
@@ -980,12 +1426,14 @@ export default function NewCardDesignerPage() {
                       </div>
                     )}
 
-                  {/* FONT */}
+                  {/* FONT SIZE */}
 
                   {selected.kind !==
                     "photo" &&
                     selected.kind !==
-                      "qr" && (
+                      "qr" &&
+                    selected.kind !==
+                      "image" && (
                       <div>
                         <label className="block font-semibold mb-1">
                           Font Size
@@ -996,6 +1444,7 @@ export default function NewCardDesignerPage() {
                           value={
                             selected.fontSize
                           }
+                          disabled={locked}
                           onChange={(e) =>
                             updateElement(
                               selected.id,
@@ -1018,7 +1467,9 @@ export default function NewCardDesignerPage() {
                   {selected.kind !==
                     "photo" &&
                     selected.kind !==
-                      "qr" && (
+                      "qr" &&
+                    selected.kind !==
+                      "image" && (
                       <div>
                         <label className="block font-semibold mb-1">
                           Text Color
@@ -1029,6 +1480,7 @@ export default function NewCardDesignerPage() {
                           value={
                             selected.color
                           }
+                          disabled={locked}
                           onChange={(e) =>
                             updateElement(
                               selected.id,
@@ -1056,6 +1508,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.x
                       )}
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -1083,6 +1536,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.y
                       )}
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -1110,6 +1564,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.width
                       )}
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -1137,6 +1592,7 @@ export default function NewCardDesignerPage() {
                       value={Math.round(
                         selected.height
                       )}
+                      disabled={locked}
                       onChange={(e) =>
                         updateElement(
                           selected.id,
@@ -1154,24 +1610,18 @@ export default function NewCardDesignerPage() {
 
                   {/* DELETE */}
 
-                  {!selected.id.includes(
-                    "valid"
-                  ) &&
-                    selected.kind !==
-                      "photo" &&
-                    selected.kind !==
-                      "qr" && (
-                      <button
-                        onClick={() =>
-                          deleteElement(
-                            selected.id
-                          )
-                        }
-                        className="w-full bg-red-600 text-white rounded-lg py-3 font-bold"
-                      >
-                        🗑️ Remove Field
-                      </button>
-                    )}
+                  {!locked && (
+                    <button
+                      onClick={() =>
+                        deleteElement(
+                          selected.id
+                        )
+                      }
+                      className="w-full bg-red-600 text-white rounded-lg py-3 font-bold"
+                    >
+                      🗑️ Delete Selected
+                    </button>
+                  )}
 
                 </div>
               )}
