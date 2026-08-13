@@ -105,21 +105,23 @@ function VerifyPageContent() {
 
     try {
       /*
-       * Supabase RPC
+       * Verify directly from the existing applications table.
        *
-       * verify_member(text)
+       * Existing setup: an approved active member has
+       * status = "approved" and is_deleted = false.
+       * No new RPC/function is required.
        */
 
       const {
         data,
         error,
-      } = await supabase.rpc(
-        "verify_member",
-        {
-          p_membership_no:
-            cleanNumber,
-        }
-      );
+      } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("membership_no", cleanNumber)
+        .eq("status", "approved")
+        .eq("is_deleted", false)
+        .maybeSingle();
 
       console.log(
         "VERIFY RESULT:",
@@ -145,18 +147,7 @@ function VerifyPageContent() {
         return;
       }
 
-      /*
-       * RPC result array ಆಗಿರಬಹುದು
-       */
-
-      let result: any = data;
-
-      if (Array.isArray(result)) {
-        result =
-          result.length > 0
-            ? result[0]
-            : null;
-      }
+      const result: any = data;
 
       /*
        * Member ಸಿಗಲಿಲ್ಲ
