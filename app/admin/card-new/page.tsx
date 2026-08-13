@@ -535,6 +535,54 @@ function cloneElements(elements: CardElement[]) {
   }));
 }
 
+/* ==================================================
+   MASTER TEMPLATE SANITIZER
+
+   Member values are displayed on the current card, but
+   they must NEVER be saved into the master template.
+   Only the design/position/style is saved.
+================================================== */
+const MEMBER_DATA_ELEMENT_IDS = new Set([
+  "name",
+  "membership",
+  "village",
+  "taluk",
+  "district",
+  "mobile",
+  "valid-from",
+  "valid-till",
+  "back-valid-from",
+  "back-valid-till",
+]);
+
+function getMasterTemplateElements(
+  current: CardElement[]
+): CardElement[] {
+  const initialById = new Map(
+    initialElements.map((element) => [element.id, element])
+  );
+
+  return current.map((element) => {
+    if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
+      return { ...element };
+    }
+
+    const original = initialById.get(element.id);
+
+    if (!original) {
+      return { ...element };
+    }
+
+    // Keep every design change (position, size, font, color,
+    // background, label, etc.), but reset only the dynamic
+    // member value so the next member gets their own details.
+    return {
+      ...element,
+      text: original.text,
+    };
+  });
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -639,10 +687,17 @@ function NewCardDesignerPageContent() {
             ) &&
             design.elements.length > 0
           ) {
+            const masterElements = cloneElements(
+              design.elements
+            );
+
             setElements(
-              cloneElements(
-                design.elements
-              )
+              memberData
+                ? applyMemberDataToElements(
+                    masterElements,
+                    memberData
+                  )
+                : masterElements
             );
           }
         }
@@ -657,7 +712,7 @@ function NewCardDesignerPageContent() {
     }
 
     loadTemplate();
-  }, []);
+  }, [memberData]);
 
   /*
   =========================================
@@ -1093,7 +1148,8 @@ function NewCardDesignerPageContent() {
       version: 1,
       cardWidth: CARD_WIDTH,
       cardHeight: CARD_HEIGHT,
-      elements,
+      // Save the MASTER design, never the current member's data.
+      elements: getMasterTemplateElements(elements),
     };
 
     try {
@@ -1182,7 +1238,8 @@ function NewCardDesignerPageContent() {
         version: 1,
         cardWidth: CARD_WIDTH,
         cardHeight: CARD_HEIGHT,
-        elements,
+        // Lock the MASTER design, never the current member's data.
+        elements: getMasterTemplateElements(elements),
       };
 
       const { error } =
@@ -1201,6 +1258,17 @@ function NewCardDesignerPageContent() {
 
       if (error) {
         throw error;
+      }
+
+      // Keep the current member visible on screen after locking.
+      // The database stores the clean master template above.
+      if (memberData) {
+        setElements((current) =>
+          applyMemberDataToElements(
+            current,
+            memberData
+          )
+        );
       }
 
       setLocked(true);
@@ -1292,7 +1360,8 @@ function NewCardDesignerPageContent() {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/'/g, "&#039;")
+      .replace(/\n/g, "<br />");
   }
 
   function buildPrintCardHtml(printSide: Side): string {
@@ -1317,7 +1386,6 @@ function NewCardDesignerPageContent() {
           "overflow:hidden",
           `z-index:${element.kind === "footer" ? 50 : 60}`,
           element.background !== "transparent" ? "padding:6px" : "padding:0",
-          "line-height:1.2",
         ].join(";");
 
         if (element.kind === "photo") {
@@ -1325,7 +1393,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};border:4px solid #166534;background:#fff;">
               ${
                 memberPhoto
-                  ? `<img src="${escapePrintHtml(memberPhoto)}" alt="Member" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+                  ? `<img src="${escapePrintHtml(memberPhoto)}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
                   : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;">👤</div>`
               }
             </div>
@@ -1337,7 +1405,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};border:4px solid #166534;background:#fff;padding:8px;">
               ${
                 qrImage
-                  ? `<img src="${escapePrintHtml(qrImage)}" alt="QR" style="width:100%;height:100%;object-fit:contain;display:block;" />`
+                  ? `<img src="${escapePrintHtml(qrImage)}" style="width:100%;height:100%;display:block;" />`
                   : ""
               }
             </div>
@@ -1349,7 +1417,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};">
               ${
                 element.src
-                  ? `<img src="${escapePrintHtml(element.src)}" alt="Card image" style="width:100%;height:100%;object-fit:contain;display:block;" />`
+                  ? `<img src="${escapePrintHtml(element.src)}" style="width:100%;height:100%;object-fit:contain;display:block;" />`
                   : ""
               }
             </div>
@@ -1365,36 +1433,36 @@ function NewCardDesignerPageContent() {
       .join("");
 
     return `
-      <section class="print-card-page">
+      <div class="print-card-page">
         <div class="print-card-inner">
           <div class="print-card-background"></div>
           <div class="print-card-top"></div>
           <div class="print-card-bottom"></div>
           ${elementHtml}
         </div>
-      </section>
+      </div>
     `;
   }
 
   async function printCard() {
     if (typeof window === "undefined") return;
 
-    // Remove an old print container before creating a fresh one.
+    // Always print BOTH sides, regardless of whether the editor is
+    // currently showing FRONT or BACK.
     document.getElementById("print-container")?.remove();
 
-    // Always print exactly two pages:
-    // Page 1 = FRONT, Page 2 = BACK.
     const printContainer = document.createElement("div");
     printContainer.id = "print-container";
-    printContainer.innerHTML =
-      buildPrintCardHtml("front") +
-      buildPrintCardHtml("back");
+    printContainer.innerHTML = `
+      ${buildPrintCardHtml("front")}
+      ${buildPrintCardHtml("back")}
+    `;
 
     document.body.appendChild(printContainer);
 
-    // Wait for photo / QR / uploaded images before opening print preview.
+    // Wait until every photo / QR / uploaded image is ready.
     const images = Array.from(
-      printContainer.querySelectorAll<HTMLImageElement>("img")
+      printContainer.querySelectorAll("img")
     );
 
     await Promise.all(
@@ -1409,7 +1477,7 @@ function NewCardDesignerPageContent() {
       )
     );
 
-    // Wait for browser layout/paint.
+    // Give the browser one layout frame before opening print preview.
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => resolve());
@@ -1422,6 +1490,7 @@ function NewCardDesignerPageContent() {
     };
 
     window.addEventListener("afterprint", cleanup);
+
     window.print();
   }
 
@@ -1493,15 +1562,8 @@ function NewCardDesignerPageContent() {
     <>
       <style jsx global>{`
         @media print {
-          /*
-           * PDF/Print layout:
-           * - Use a normal A4 page so Chrome/Edge does not create extra
-           *   pages from the 85.6mm x 53.9mm @page + body combination.
-           * - Exactly two .print-card-page blocks are created:
-           *   page 1 = FRONT, page 2 = BACK.
-           */
           @page {
-            size: A4 portrait;
+            size: 85.6mm 53.9mm;
             margin: 0;
           }
 
@@ -1509,26 +1571,22 @@ function NewCardDesignerPageContent() {
           body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 210mm !important;
-            min-width: 210mm !important;
-            max-width: 210mm !important;
             background: #ffffff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
           }
 
+          /* Print ONLY the dedicated two-card container.
+             Do not use visibility:hidden for the whole app because hidden
+             elements still participate in print layout and can create
+             extra blank pages. */
           body > *:not(#print-container) {
             display: none !important;
           }
 
-          #print-container {
-            display: block !important;
-            position: static !important;
-            width: 210mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-            visibility: visible !important;
+          html,
+          body {
+            width: 85.6mm !important;
+            min-width: 85.6mm !important;
+            max-width: 85.6mm !important;
           }
 
           #print-container,
@@ -1536,74 +1594,67 @@ function NewCardDesignerPageContent() {
             visibility: visible !important;
           }
 
-          /*
-           * One full A4 page per card. The card is centered on the page.
-           * The card itself keeps the same 856 x 539 design used by the
-           * editor and is scaled only for print-page fitting.
-           */
-          #print-container .print-card-page {
-            display: flex !important;
-            position: relative !important;
-            align-items: center !important;
-            justify-content: center !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            min-width: 210mm !important;
-            min-height: 297mm !important;
-            max-width: 210mm !important;
-            max-height: 297mm !important;
+          #print-container {
+            display: block !important;
+            position: static !important;
+            width: 85.6mm !important;
+            height: 107.8mm !important;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: visible !important;
+          }
+
+          #print-container .print-card-page {
+            display: block !important;
+            position: relative !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            min-width: 85.6mm !important;
+            min-height: 53.9mm !important;
+            max-width: 85.6mm !important;
+            max-height: 53.9mm !important;
             overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
             box-sizing: border-box !important;
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-            break-after: page !important;
+            page-break-before: auto !important;
             page-break-after: always !important;
+            break-before: auto !important;
+            break-after: page !important;
+          }
+
+          #print-container .print-card-page + .print-card-page {
+            page-break-before: always !important;
+            break-before: page !important;
           }
 
           #print-container .print-card-page:last-child {
-            break-after: auto !important;
             page-break-after: auto !important;
+            break-after: auto !important;
           }
 
-          /*
-           * 856 x 539 px is the exact editor card coordinate system.
-           * zoom 0.795 keeps the card at about 180mm x 113.3mm while
-           * preserving every element's original x/y/width/height.
-           */
-          #print-container .print-card-inner {
-            position: relative !important;
-            flex: 0 0 auto !important;
+          .print-card-inner {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            zoom: 0.795 !important;
+            /* Use zoom for print layout so the complete 856x539 editor
+               card is laid out as one 85.6x53.9mm physical card. */
+            zoom: 0.3779527559 !important;
             transform: none !important;
-            transform-origin: center center !important;
+            transform-origin: top left !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
             border: 4px solid #075c2b !important;
             border-radius: 22px !important;
-            background: linear-gradient(
-              135deg,
-              #ffffff 0%,
-              #f7fff8 55%,
-              #e8f6df 100%
-            ) !important;
-            font-family: inherit !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
           }
 
           .print-card-background {
             position: absolute !important;
             inset: 0 !important;
-            background: linear-gradient(
-              135deg,
-              #ffffff 0%,
-              #f7fff8 55%,
-              #e8f6df 100%
-            ) !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
           }
 
           .print-card-top {
@@ -1612,11 +1663,7 @@ function NewCardDesignerPageContent() {
             right: 0 !important;
             top: 0 !important;
             height: 115px !important;
-            background: linear-gradient(
-              135deg,
-              #ffffff,
-              #f6fff8
-            ) !important;
+            background: linear-gradient(135deg,#ffffff,#f6fff8) !important;
             border-bottom: 10px solid #075c2b !important;
           }
 
@@ -1626,11 +1673,7 @@ function NewCardDesignerPageContent() {
             right: 0 !important;
             bottom: 0 !important;
             height: 150px !important;
-            background: linear-gradient(
-              to top,
-              #d8efc8,
-              transparent
-            ) !important;
+            background: linear-gradient(to top,#d8efc8,transparent) !important;
             opacity: 0.55 !important;
           }
 
@@ -2207,7 +2250,7 @@ function NewCardDesignerPageContent() {
 
             {/* EDIT PANEL */}
 
-            <aside className="bg-white rounded-2xl shadow p-5 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-2rem)] lg:min-h-0 lg:overflow-y-auto">
+            <aside className="bg-white rounded-2xl shadow p-5 h-fit lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
 
               <h2 className="text-xl font-extrabold mb-4">
                 ✏️ Edit Selected
