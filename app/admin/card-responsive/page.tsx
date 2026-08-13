@@ -1479,61 +1479,278 @@ function NewCardDesignerPageContent() {
   }
 
   async function printCard() {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
 
     /*
-     * PDF / Print output:
+     * PDF / Print output
+     * -----------------
      * Page 1 = FRONT
      * Page 2 = BACK
-     * Each page is exactly CR80 PVC card size: 85.6 × 53.9 mm.
-     * No popup and no A4 layout are used.
+     * Each page = 85.6mm × 53.9mm (CR80 PVC card).
+     *
+     * IMPORTANT:
+     * The card HTML is printed from an isolated iframe instead of
+     * modifying the main document. This avoids mobile-browser print
+     * engines dropping the dynamically-created card and producing
+     * a white page.
      */
-    document.getElementById("print-container")?.remove();
-
-    const printContainer = document.createElement("div");
-    printContainer.id = "print-container";
-    printContainer.innerHTML = `
-      ${buildPrintCardHtml("front")}
-      ${buildPrintCardHtml("back")}
-    `;
-
-    document.body.appendChild(printContainer);
-
-    const images = Array.from(
-      printContainer.querySelectorAll("img")
+    const oldFrame = document.getElementById(
+      "card-pdf-print-frame"
     );
+    oldFrame?.remove();
 
-    await Promise.all(
-      images.map(
-        (image) =>
-          image.complete
-            ? Promise.resolve()
-            : new Promise<void>((resolve) => {
-                image.onload = () => resolve();
-                image.onerror = () => resolve();
-              })
-      )
-    );
+    const iframe = document.createElement("iframe");
+    iframe.id = "card-pdf-print-frame";
+    iframe.setAttribute("aria-hidden", "true");
 
-    if (document.fonts?.ready) {
-      try {
-        await document.fonts.ready;
-      } catch {}
-    }
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
+    Object.assign(iframe.style, {
+      position: "fixed",
+      width: "1px",
+      height: "1px",
+      right: "0",
+      bottom: "0",
+      border: "0",
+      opacity: "0",
+      pointerEvents: "none",
+      zIndex: "-1",
     });
 
-    const cleanup = () => {
-      document.getElementById("print-container")?.remove();
-      window.removeEventListener("afterprint", cleanup);
+    document.body.appendChild(iframe);
+
+    const frameDocument =
+      iframe.contentDocument ||
+      iframe.contentWindow?.document;
+
+    if (!frameDocument || !iframe.contentWindow) {
+      iframe.remove();
+      alert("PDF print page create ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.");
+      return;
+    }
+
+    const frontHtml = buildPrintCardHtml("front");
+    const backHtml = buildPrintCardHtml("back");
+
+    const printCss = `
+      @page {
+        size: 85.6mm 53.9mm;
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 85.6mm !important;
+        min-width: 85.6mm !important;
+        max-width: 85.6mm !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      body {
+        overflow: visible !important;
+      }
+
+      .print-card-page {
+        display: block !important;
+        position: relative !important;
+        width: 85.6mm !important;
+        height: 53.9mm !important;
+        min-width: 85.6mm !important;
+        min-height: 53.9mm !important;
+        max-width: 85.6mm !important;
+        max-height: 53.9mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-before: auto !important;
+        break-before: auto !important;
+        visibility: visible !important;
+      }
+
+      .print-card-page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      .print-card-inner {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 85.6mm !important;
+        height: 53.9mm !important;
+        transform: none !important;
+        transform-origin: top left !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        border: 0.4mm solid #075c2b !important;
+        border-radius: 2.2mm !important;
+        background: linear-gradient(
+          135deg,
+          #ffffff 0%,
+          #f7fff8 55%,
+          #e8f6df 100%
+        ) !important;
+      }
+
+      .print-card-background {
+        position: absolute !important;
+        inset: 0 !important;
+        background: linear-gradient(
+          135deg,
+          #ffffff 0%,
+          #f7fff8 55%,
+          #e8f6df 100%
+        ) !important;
+      }
+
+      .print-card-top {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: 0 !important;
+        height: 11.5mm !important;
+        background: linear-gradient(
+          135deg,
+          #ffffff,
+          #f6fff8
+        ) !important;
+        border-bottom: 1mm solid #075c2b !important;
+      }
+
+      .print-card-bottom {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        height: 15mm !important;
+        background: linear-gradient(
+          to top,
+          #d8efc8,
+          transparent
+        ) !important;
+        opacity: 0.55 !important;
+      }
+
+      img {
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+      }
+
+      @media print {
+        html,
+        body {
+          width: 85.6mm !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      }
+    `;
+
+    frameDocument.open();
+    frameDocument.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta
+            name="viewport"
+            content="width=85.6, initial-scale=1"
+          />
+          <title>Farmer PVC Card</title>
+          <style>${printCss}</style>
+        </head>
+        <body>
+          ${frontHtml}
+          ${backHtml}
+        </body>
+      </html>
+    `);
+    frameDocument.close();
+
+    const waitForImages = async () => {
+      const images = Array.from(
+        frameDocument.querySelectorAll("img")
+      );
+
+      await Promise.all(
+        images.map(
+          (image) =>
+            image.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  image.onload = () => resolve();
+                  image.onerror = () => resolve();
+                })
+        )
+      );
     };
 
-    window.addEventListener("afterprint", cleanup);
-    window.print();
+    try {
+      await waitForImages();
+
+      if (frameDocument.fonts?.ready) {
+        try {
+          await frameDocument.fonts.ready;
+        } catch {}
+      }
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 150);
+      });
+
+      let cleaned = false;
+
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        iframe.remove();
+        window.removeEventListener(
+          "afterprint",
+          cleanup
+        );
+      };
+
+      window.addEventListener(
+        "afterprint",
+        cleanup,
+        { once: true }
+      );
+
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+
+      /*
+       * Some mobile browsers do not fire afterprint reliably.
+       * Do not remove the iframe immediately; keep it alive long
+       * enough for the native print sheet to capture its document.
+       */
+      window.setTimeout(cleanup, 60000);
+    } catch (error) {
+      iframe.remove();
+      console.error(
+        "Card PDF print error:",
+        error
+      );
+      alert(
+        "PDF generate ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      );
+    }
   }
 
   function resetDesign() {
