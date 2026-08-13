@@ -1506,11 +1506,8 @@ function NewCardDesignerPageContent() {
             background: #ffffff !important;
           }
 
-          /* Print ONLY the temporary two-card container.
-             The old visibility:hidden approach still kept the full editor
-             in the print flow and caused extra blank pages. */
-          body > *:not(#print-container) {
-            display: none !important;
+          body * {
+            visibility: hidden !important;
           }
 
           #print-container,
@@ -1521,7 +1518,7 @@ function NewCardDesignerPageContent() {
           #print-container {
             display: block !important;
             position: static !important;
-            width: 85.6mm !important;
+            width: 100% !important;
             height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -1530,25 +1527,25 @@ function NewCardDesignerPageContent() {
           #print-container .print-card-page {
             display: block !important;
             position: relative !important;
-            width: 85.6mm !important;
-            height: 53.9mm !important;
-            min-width: 85.6mm !important;
-            min-height: 53.9mm !important;
-            max-width: 85.6mm !important;
-            max-height: 53.9mm !important;
+            width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 856 / 539 !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            max-width: none !important;
+            max-height: none !important;
             overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
-            box-sizing: border-box !important;
-            page-break-before: auto !important;
+            page-break-before: always !important;
             page-break-after: always !important;
-            break-before: auto !important;
+            break-before: page !important;
             break-after: page !important;
           }
 
-          #print-container .print-card-page + .print-card-page {
-            page-break-before: always !important;
-            break-before: page !important;
+          #print-container .print-card-page:first-child {
+            page-break-before: auto !important;
+            break-before: auto !important;
           }
 
           #print-container .print-card-page:last-child {
@@ -1562,7 +1559,7 @@ function NewCardDesignerPageContent() {
             top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            transform: scale(0.3779527559) !important;
+            transform: scale(calc(100vw / 856px)) !important;
             transform-origin: top left !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
@@ -1786,7 +1783,7 @@ function NewCardDesignerPageContent() {
 
           {/* MAIN GRID */}
 
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+          <div className="grid lg:grid-cols-[1fr_340px] gap-5">
 
             {/* CARD AREA */}
 
@@ -2170,7 +2167,7 @@ function NewCardDesignerPageContent() {
 
             {/* EDIT PANEL */}
 
-            <aside className="bg-white rounded-2xl shadow p-5 min-h-0 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <aside className="bg-white rounded-2xl shadow p-5 h-fit lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
 
               <h2 className="text-xl font-extrabold mb-4">
                 ✏️ Edit Selected
