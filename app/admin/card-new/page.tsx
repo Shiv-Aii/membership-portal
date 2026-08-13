@@ -1571,7 +1571,10 @@ function NewCardDesignerPageContent() {
             top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            transform: scale(0.3779527559) !important;
+            /* Use zoom for print layout so the complete 856x539 editor
+               card is laid out as one 85.6x53.9mm physical card. */
+            zoom: 0.3779527559 !important;
+            transform: none !important;
             transform-origin: top left !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
