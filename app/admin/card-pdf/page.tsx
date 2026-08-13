@@ -990,12 +990,7 @@ function PdfGeneratorPageContent() {
                       "front",
                       memberPhoto,
                       qrImage
-                    )
-                      .replace(
-                        /^\\s*<div class="pdf-page">[\\s\\S]*?<div class="pdf-card">/,
-                        ""
-                      )
-                      .replace(/<\\/div>\\s*$/, ""),
+                    ),
                   }}
                 />
               </div>
@@ -1013,12 +1008,7 @@ function PdfGeneratorPageContent() {
                       "back",
                       memberPhoto,
                       qrImage
-                    )
-                      .replace(
-                        /^\\s*<div class="pdf-page">[\\s\\S]*?<div class="pdf-card">/,
-                        ""
-                      )
-                      .replace(/<\\/div>\\s*$/, ""),
+                    ),
                   }}
                 />
               </div>
