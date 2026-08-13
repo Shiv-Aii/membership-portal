@@ -1411,7 +1411,11 @@ function NewCardDesignerPageContent() {
           "box-sizing:border-box",
           "overflow:hidden",
           `z-index:${element.kind === "footer" ? 50 : 60}`,
-          element.background !== "transparent" ? "padding:6px" : "padding:0",
+          element.background !== "transparent"
+            ? "padding:6px"
+            : "padding:0",
+          "font-family:Arial,'Noto Sans Kannada','Noto Sans',sans-serif",
+          "line-height:1.2",
         ].join(";");
 
         if (element.kind === "photo") {
@@ -1419,7 +1423,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};border:4px solid #166534;background:#fff;">
               ${
                 memberPhoto
-                  ? `<img src="${escapePrintHtml(memberPhoto)}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+                  ? `<img src="${escapePrintHtml(memberPhoto)}" alt="Member Photo" style="width:100%;height:100%;object-fit:cover;display:block;" />`
                   : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;">👤</div>`
               }
             </div>
@@ -1431,7 +1435,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};border:4px solid #166534;background:#fff;padding:8px;">
               ${
                 qrImage
-                  ? `<img src="${escapePrintHtml(qrImage)}" style="width:100%;height:100%;display:block;" />`
+                  ? `<img src="${escapePrintHtml(qrImage)}" alt="QR Code" style="width:100%;height:100%;display:block;object-fit:contain;" />`
                   : ""
               }
             </div>
@@ -1443,7 +1447,7 @@ function NewCardDesignerPageContent() {
             <div style="${commonStyle};">
               ${
                 element.src
-                  ? `<img src="${escapePrintHtml(element.src)}" style="width:100%;height:100%;object-fit:contain;display:block;" />`
+                  ? `<img src="${escapePrintHtml(element.src)}" alt="Card Image" style="width:100%;height:100%;object-fit:contain;display:block;" />`
                   : ""
               }
             </div>
@@ -1459,65 +1463,272 @@ function NewCardDesignerPageContent() {
       .join("");
 
     return `
-      <div class="print-card-page">
-        <div class="print-card-inner">
-          <div class="print-card-background"></div>
-          <div class="print-card-top"></div>
-          <div class="print-card-bottom"></div>
+      <section class="card-pdf-page">
+        <div class="card-pdf-inner">
+          <div class="card-pdf-background"></div>
+          <div class="card-pdf-top"></div>
+          <div class="card-pdf-bottom"></div>
           ${elementHtml}
         </div>
-      </div>
+      </section>
     `;
   }
 
   async function printCard() {
     if (typeof window === "undefined") return;
 
-    // Always print BOTH sides, regardless of whether the editor is
-    // currently showing FRONT or BACK.
-    document.getElementById("print-container")?.remove();
+    /*
+     * IMPORTANT:
+     * Do not print the existing Next.js page.
+     * Open a clean print window containing ONLY the two PVC cards.
+     *
+     * Card size:
+     * 85.6 mm × 53.9 mm (standard CR80/PVC card size)
+     *
+     * Page 1 = FRONT
+     * Page 2 = BACK
+     */
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1000,height=800,noopener,noreferrer"
+    );
 
-    const printContainer = document.createElement("div");
-    printContainer.id = "print-container";
-    printContainer.innerHTML = `
-      ${buildPrintCardHtml("front")}
-      ${buildPrintCardHtml("back")}
+    if (!printWindow) {
+      alert(
+        "PDF window open ಆಗಲಿಲ್ಲ.\n\nBrowser ನಲ್ಲಿ pop-up permission Allow ಮಾಡಿ, ನಂತರ ಮತ್ತೆ PDF button ಒತ್ತಿ."
+      );
+      return;
+    }
+
+    const printHtml = `
+      <!doctype html>
+      <html lang="kn">
+        <head>
+          <meta charset="UTF-8" />
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          />
+          <title>${escapePrintHtml(TEMPLATE_NAME)} - PDF</title>
+
+          <style>
+            @page {
+              size: 85.6mm 53.9mm;
+              margin: 0;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            html,
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 85.6mm !important;
+              min-width: 85.6mm !important;
+              max-width: 85.6mm !important;
+              background: #ffffff !important;
+            }
+
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              font-family: Arial, "Noto Sans Kannada", "Noto Sans", sans-serif;
+            }
+
+            .card-pdf-page {
+              position: relative;
+              width: 85.6mm;
+              height: 53.9mm;
+              min-width: 85.6mm;
+              min-height: 53.9mm;
+              max-width: 85.6mm;
+              max-height: 53.9mm;
+              overflow: hidden;
+              margin: 0;
+              padding: 0;
+              page-break-after: always;
+              break-after: page;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            .card-pdf-page:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+
+            /*
+             * The editor uses 856 × 539 CSS pixels.
+             * 85.6 × 53.9 mm at 96 DPI is approximately
+             * 323.15 × 203.53 CSS pixels.
+             *
+             * 323.15 / 856 = 0.37751
+             * 203.53 / 539 = 0.37742
+             *
+             * Use the exact physical card ratio so the whole
+             * card fits inside the PVC page without A4 scaling.
+             */
+            .card-pdf-inner {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 856px;
+              height: 539px;
+              transform: scale(0.3779527559);
+              transform-origin: top left;
+              overflow: hidden;
+              box-sizing: border-box;
+              border: 4px solid #075c2b;
+              border-radius: 22px;
+              background: linear-gradient(
+                135deg,
+                #ffffff 0%,
+                #f7fff8 55%,
+                #e8f6df 100%
+              );
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+
+            .card-pdf-background {
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(
+                135deg,
+                #ffffff 0%,
+                #f7fff8 55%,
+                #e8f6df 100%
+              );
+              z-index: 1;
+            }
+
+            .card-pdf-top {
+              position: absolute;
+              left: 0;
+              right: 0;
+              top: 0;
+              height: 115px;
+              background: linear-gradient(
+                135deg,
+                #ffffff,
+                #f6fff8
+              );
+              border-bottom: 10px solid #075c2b;
+              z-index: 2;
+            }
+
+            .card-pdf-bottom {
+              position: absolute;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              height: 150px;
+              background: linear-gradient(
+                to top,
+                #d8efc8,
+                transparent
+              );
+              opacity: 0.55;
+              z-index: 2;
+            }
+
+            .card-pdf-inner img {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+
+            @media screen {
+              body {
+                width: 100vw !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                background: #e5e7eb !important;
+              }
+
+              .card-pdf-page {
+                margin: 20px auto;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+              }
+            }
+
+            @media print {
+              html,
+              body {
+                width: 85.6mm !important;
+                min-width: 85.6mm !important;
+                max-width: 85.6mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+              }
+
+              .card-pdf-page {
+                margin: 0 !important;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+          ${buildPrintCardHtml("front")}
+          ${buildPrintCardHtml("back")}
+
+          <script>
+            (async function () {
+              const images = Array.from(document.images);
+
+              await Promise.all(
+                images.map((img) => {
+                  if (img.complete) {
+                    return Promise.resolve();
+                  }
+
+                  return new Promise((resolve) => {
+                    img.addEventListener("load", resolve, {
+                      once: true
+                    });
+
+                    img.addEventListener("error", resolve, {
+                      once: true
+                    });
+                  });
+                })
+              );
+
+              if (document.fonts && document.fonts.ready) {
+                try {
+                  await document.fonts.ready;
+                } catch (e) {}
+              }
+
+              setTimeout(function () {
+                window.focus();
+                window.print();
+              }, 300);
+            })();
+          </script>
+        </body>
+      </html>
     `;
 
-    document.body.appendChild(printContainer);
+    printWindow.document.open();
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
 
-    // Wait until every photo / QR / uploaded image is ready.
-    const images = Array.from(
-      printContainer.querySelectorAll("img")
-    );
-
-    await Promise.all(
-      images.map(
-        (image) =>
-          image.complete
-            ? Promise.resolve()
-            : new Promise<void>((resolve) => {
-                image.onload = () => resolve();
-                image.onerror = () => resolve();
-              })
-      )
-    );
-
-    // Give the browser one layout frame before opening print preview.
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
-
-    const cleanup = () => {
-      document.getElementById("print-container")?.remove();
-      window.removeEventListener("afterprint", cleanup);
+    /*
+     * After printing, close the temporary print window.
+     * A small delay gives Chrome time to finish Save as PDF.
+     */
+    printWindow.onafterprint = () => {
+      setTimeout(() => {
+        try {
+          printWindow.close();
+        } catch {}
+      }, 300);
     };
-
-    window.addEventListener("afterprint", cleanup);
-
-    window.print();
   }
 
   function resetDesign() {
@@ -1796,7 +2007,7 @@ function NewCardDesignerPageContent() {
                   onClick={printCard}
                   className="px-5 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700"
                 >
-                  🖨️ Print Front + Back / Save PDF
+                  📄 Generate Card PDF
                 </button>
 
                 {!locked && (
