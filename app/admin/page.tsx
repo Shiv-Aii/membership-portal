@@ -372,164 +372,149 @@ export default function Admin() {
   // APPROVE MEMBER
   // =====================================================
 
-  async function approve(
-    a: any
-  ) {
-    /*
-     * Databaseನಿಂದ next number ತೆಗೆದುಕೊಳ್ಳುತ್ತದೆ.
-     *
-     * ಉದಾಹರಣೆ:
-     * next_membership_no = 10
-     *
-     * Automatic next number = 10
-     */
+  async function approve(a: Application) {
+  const next = prompt(
+    "Membership Number ಹಾಕಿ.\n\nಖಾಲಿ ಬಿಟ್ಟರೆ automatic number ಬರುತ್ತದೆ.",
+    ""
+  );
 
-    const automaticNext =
-      await getNextMembershipNumber();
-
-    const input =
-      prompt(
-        `Membership Number ಹಾಕಿ.\n\nAutomatic next number: ${automaticNext}\n\nಖಾಲಿ ಬಿಟ್ಟರೆ ${automaticNext} ಬಳಸಲಾಗುತ್ತದೆ.`,
-        automaticNext
-      );
-
-    if (input === null) {
-      return;
-    }
-
-    const membershipNumber =
-      input.trim() ||
-      automaticNext;
-
-    // Only numbers
-    if (
-      !/^\d+$/.test(
-        membershipNumber
-      )
-    ) {
-      alert(
-        "Membership Number numeric ಆಗಿರಬೇಕು."
-      );
-
-      return;
-    }
-
-    // Duplicate check
-    const duplicate =
-      apps.find(
-        (item: any) =>
-          item.id !== a.id &&
-          item.is_deleted !== true &&
-          item.membership_no &&
-          String(
-            item.membership_no
-          ).trim() ===
-            membershipNumber
-      );
-
-    if (duplicate) {
-      alert(
-        `Membership Number ${membershipNumber} ಈಗಾಗಲೇ ಬಳಕೆಯಲ್ಲಿದೆ.\n\nMember: ${duplicate.name}`
-      );
-
-      return;
-    }
-
-    // =================================================
-    // APPROVE APPLICATION
-    // =================================================
-
-    const { error } =
-      await supabase
-        .from("applications")
-        .update({
-          status:
-            "approved",
-
-          membership_no:
-            membershipNumber,
-
-          is_deleted:
-            false,
-
-          deleted_at:
-            null,
-
-          deleted_by:
-            null,
-        })
-        .eq("id", a.id);
-
-    if (error) {
-      alert(
-        "Approve ಆಗಲಿಲ್ಲ:\n\n" +
-          error.message
-      );
-
-      return;
-    }
-
-    // =================================================
-    // CREATE PUBLIC PAGE
-    // =================================================
-
-    const publicPageCreated =
-      await createPublicPage({
-        ...a,
-
-        status:
-          "approved",
-
-        membership_no:
-          membershipNumber,
-      });
-
-    if (!publicPageCreated) {
-      return;
-    }
-
-    // =================================================
-    // MOVE TO NEXT MEMBERSHIP NUMBER
-    // =================================================
-
-    const nextNumber =
-      Number(
-        membershipNumber
-      ) + 1;
-
-    const {
-      error: sequenceError,
-    } = await supabase
-      .from("site_settings")
-      .update({
-        next_membership_no:
-          nextNumber,
-      })
-      .eq("id", 1);
-
-    if (sequenceError) {
-      console.error(
-        "Membership sequence update failed:",
-        sequenceError
-      );
-
-      alert(
-        "Member approve ಆಯಿತು, ಆದರೆ ಮುಂದಿನ Membership Number save ಆಗಲಿಲ್ಲ:\n\n" +
-          sequenceError.message
-      );
-
-      await load();
-
-      return;
-    }
-
-    await load();
-
-    alert(
-      `Member Approved ✅\n\nMembership Number: ${membershipNumber}\n\nಮುಂದಿನ number: ${nextNumber}`
-    );
+  if (next === null) {
+    return;
   }
 
+  /* =========================================
+     1. APPROVE MEMBER
+  ========================================= */
+
+  const { error: approveError } =
+    await supabase.rpc(
+      "approve_application",
+      {
+        p_id: a.id,
+        p_membership_no:
+          next.trim() || null,
+      }
+    );
+
+  if (approveError) {
+    alert(approveError.message);
+    return;
+  }
+
+  /* =========================================
+     2. VALIDITY DATE
+     
+     Approve Date
+     ↓
+     Valid From = Approve Date
+     ↓
+     Valid Till = 1 year - 1 day
+  ========================================= */
+
+  const today = new Date();
+
+  const validFrom =
+    `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`;
+
+  const validUntilDate =
+    new Date(today);
+
+  validUntilDate.setFullYear(
+    validUntilDate.getFullYear() + 1
+  );
+
+  validUntilDate.setDate(
+    validUntilDate.getDate() - 1
+  );
+
+  const validUntil =
+    `${validUntilDate.getFullYear()}-${String(
+      validUntilDate.getMonth() + 1
+    ).padStart(2, "0")}-${String(
+      validUntilDate.getDate()
+    ).padStart(2, "0")}`;
+
+  /* =========================================
+     3. SAVE VALIDITY
+  ========================================= */
+
+  const {
+    error: validityError,
+  } = await supabase
+    .from("applications")
+    .update({
+      valid_from: validFrom,
+      valid_until: validUntil,
+    })
+    .eq("id", a.id);
+
+  if (validityError) {
+    console.error(
+      "Validity update error:",
+      validityError
+    );
+
+    alert(
+      "Member Approved ಆಗಿದೆ, ಆದರೆ Validity Date save ಆಗಲಿಲ್ಲ.\n\n" +
+        validityError.message
+    );
+
+    return;
+  }
+
+  /* =========================================
+     4. GET UPDATED MEMBER
+     
+     ಇದರಿಂದ automatic membership number ಕೂಡ
+     ಸರಿಯಾಗಿ ಪಡೆಯುತ್ತೇವೆ.
+  ========================================= */
+
+  const {
+    data: updatedMember,
+    error: memberError,
+  } = await supabase
+    .from("applications")
+    .select("*")
+    .eq("id", a.id)
+    .maybeSingle();
+
+  if (memberError || !updatedMember) {
+    alert(
+      "Approved member data load ಆಗಲಿಲ್ಲ."
+    );
+    return;
+  }
+
+  /* =========================================
+     5. AUTOMATIC PUBLIC PAGE
+  ========================================= */
+
+  const publicPageCreated =
+    await createPublicPage(
+      updatedMember as Application
+    );
+
+  if (!publicPageCreated) {
+    return;
+  }
+
+  /* =========================================
+     6. REFRESH ADMIN LIST
+  ========================================= */
+
+  await load();
+
+  alert(
+    `Member Approved ✅\n\n` +
+      `Valid From: ${validFrom}\n` +
+      `Valid Till: ${validUntil}\n\n` +
+      `Public Page ಕೂಡ automatic ಆಗಿ create ಆಗಿದೆ.`
+  );
+}
   // =====================================================
   // REJECT
   // =====================================================
