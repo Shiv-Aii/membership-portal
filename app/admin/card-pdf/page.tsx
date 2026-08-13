@@ -63,6 +63,12 @@ const MEMBER_TABLES = [
   "member_profiles",
 ];
 
+function cloneElements(elements: CardElement[]): CardElement[] {
+  return elements.map((element) => ({
+    ...element,
+  }));
+}
+
 function firstValue(
   row: MemberRecord | null | undefined,
   keys: string[]
