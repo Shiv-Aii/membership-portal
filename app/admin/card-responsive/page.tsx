@@ -1631,20 +1631,18 @@ function NewCardDesignerPageContent() {
 
           #print-container {
             display: block !important;
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
             width: 85.6mm !important;
-            height: 107.8mm !important;
+            height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
-            z-index: 2147483647 !important;
           }
 
           #print-container,
           #print-container * {
             visibility: visible !important;
+            opacity: 1 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
