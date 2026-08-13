@@ -1286,8 +1286,142 @@ function NewCardDesignerPageContent() {
      =========================================
   */
 
-  function printCard() {
+  function escapePrintHtml(value: unknown): string {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;")
+      .replace(/\n/g, "<br />");
+  }
+
+  function buildPrintCardHtml(printSide: Side): string {
+    const sideElements = elements.filter(
+      (element) => element.side === printSide
+    );
+
+    const elementHtml = sideElements
+      .map((element) => {
+        const commonStyle = [
+          "position:absolute",
+          `left:${element.x}px`,
+          `top:${element.y}px`,
+          `width:${element.width}px`,
+          `height:${element.height}px`,
+          `font-size:${element.fontSize}px`,
+          `font-weight:${element.fontWeight}`,
+          `color:${element.color}`,
+          `background:${element.background}`,
+          `border-radius:${element.borderRadius || 0}px`,
+          "box-sizing:border-box",
+          "overflow:hidden",
+          `z-index:${element.kind === "footer" ? 50 : 60}`,
+          element.background !== "transparent" ? "padding:6px" : "padding:0",
+        ].join(";");
+
+        if (element.kind === "photo") {
+          return `
+            <div style="${commonStyle};border:4px solid #166534;background:#fff;">
+              ${
+                memberPhoto
+                  ? `<img src="${escapePrintHtml(memberPhoto)}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;">👤</div>`
+              }
+            </div>
+          `;
+        }
+
+        if (element.kind === "qr") {
+          return `
+            <div style="${commonStyle};border:4px solid #166534;background:#fff;padding:8px;">
+              ${
+                qrImage
+                  ? `<img src="${escapePrintHtml(qrImage)}" style="width:100%;height:100%;display:block;" />`
+                  : ""
+              }
+            </div>
+          `;
+        }
+
+        if (element.kind === "image") {
+          return `
+            <div style="${commonStyle};">
+              ${
+                element.src
+                  ? `<img src="${escapePrintHtml(element.src)}" style="width:100%;height:100%;object-fit:contain;display:block;" />`
+                  : ""
+              }
+            </div>
+          `;
+        }
+
+        return `
+          <div style="${commonStyle};display:flex;align-items:center;">
+            ${escapePrintHtml(element.text)}
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="print-card-page">
+        <div class="print-card-inner">
+          <div class="print-card-background"></div>
+          <div class="print-card-top"></div>
+          <div class="print-card-bottom"></div>
+          ${elementHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  async function printCard() {
     if (typeof window === "undefined") return;
+
+    // Always print BOTH sides, regardless of whether the editor is
+    // currently showing FRONT or BACK.
+    document.getElementById("print-container")?.remove();
+
+    const printContainer = document.createElement("div");
+    printContainer.id = "print-container";
+    printContainer.innerHTML = `
+      ${buildPrintCardHtml("front")}
+      ${buildPrintCardHtml("back")}
+    `;
+
+    document.body.appendChild(printContainer);
+
+    // Wait until every photo / QR / uploaded image is ready.
+    const images = Array.from(
+      printContainer.querySelectorAll("img")
+    );
+
+    await Promise.all(
+      images.map(
+        (image) =>
+          image.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                image.onload = () => resolve();
+                image.onerror = () => resolve();
+              })
+      )
+    );
+
+    // Give the browser one layout frame before opening print preview.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    const cleanup = () => {
+      document.getElementById("print-container")?.remove();
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
 
     window.print();
   }
@@ -1369,8 +1503,6 @@ function NewCardDesignerPageContent() {
           body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 85.6mm !important;
-            height: 53.9mm !important;
             background: #ffffff !important;
           }
 
@@ -1378,28 +1510,92 @@ function NewCardDesignerPageContent() {
             visibility: hidden !important;
           }
 
-          [data-print-card="true"],
-          [data-print-card="true"] * {
+          #print-container,
+          #print-container * {
             visibility: visible !important;
           }
 
-          [data-print-card="true"] {
-            position: fixed !important;
+          #print-container {
+            display: block !important;
+            position: static !important;
+            width: 85.6mm !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          #print-container .print-card-page {
+            display: block !important;
+            position: relative !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            min-width: 85.6mm !important;
+            min-height: 53.9mm !important;
+            max-width: 85.6mm !important;
+            max-height: 53.9mm !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            page-break-before: always !important;
+            page-break-after: always !important;
+            break-before: page !important;
+            break-after: page !important;
+          }
+
+          #print-container .print-card-page:first-child {
+            page-break-before: auto !important;
+            break-before: auto !important;
+          }
+
+          #print-container .print-card-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
+          .print-card-inner {
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            min-width: 856px !important;
-            min-height: 539px !important;
-            margin: 0 !important;
-            transform: scale(0.37796) !important;
+            transform: scale(0.3779527559) !important;
             transform-origin: top left !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            border: 4px solid #075c2b !important;
+            border-radius: 22px !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
           }
 
-          [data-print-card="true"] .ring-2 {
-            box-shadow: none !important;
+          .print-card-background {
+            position: absolute !important;
+            inset: 0 !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
+          }
+
+          .print-card-top {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            height: 115px !important;
+            background: linear-gradient(135deg,#ffffff,#f6fff8) !important;
+            border-bottom: 10px solid #075c2b !important;
+          }
+
+          .print-card-bottom {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            height: 150px !important;
+            background: linear-gradient(to top,#d8efc8,transparent) !important;
+            opacity: 0.55 !important;
+          }
+
+          #print-container img {
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
           }
 
           button,
@@ -1407,7 +1603,7 @@ function NewCardDesignerPageContent() {
           select,
           textarea,
           aside {
-            visibility: hidden !important;
+            display: none !important;
           }
         }
       `}</style>
@@ -1470,7 +1666,7 @@ function NewCardDesignerPageContent() {
                   onClick={printCard}
                   className="px-5 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700"
                 >
-                  🖨️ Print / Save PDF
+                  🖨️ Print Front + Back / Save PDF
                 </button>
 
                 {!locked && (
@@ -1970,7 +2166,7 @@ function NewCardDesignerPageContent() {
 
             {/* EDIT PANEL */}
 
-            <aside className="bg-white rounded-2xl shadow p-5 h-fit">
+            <aside className="bg-white rounded-2xl shadow p-5 h-fit lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
 
               <h2 className="text-xl font-extrabold mb-4">
                 ✏️ Edit Selected
