@@ -74,6 +74,10 @@ function VerifyPageContent() {
 
     if (qrNumber) {
       setNumber(qrNumber);
+
+      // QR scan ಆದಾಗ number ಮಾತ್ರ fill ಆಗಬಾರದು.
+      // Direct verification ಕೂಡ automatically ಆಗಬೇಕು.
+      verifyMember(qrNumber);
     }
   }, [searchParams]);
 
@@ -81,9 +85,9 @@ function VerifyPageContent() {
      VERIFY MEMBER
   =================================================== */
 
-  async function verifyMember() {
+  async function verifyMember(inputNumber?: string) {
     const cleanNumber =
-      number.trim();
+      (inputNumber ?? number).trim();
 
     if (!cleanNumber) {
       alert(
