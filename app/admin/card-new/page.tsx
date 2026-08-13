@@ -1280,6 +1280,152 @@ function NewCardDesignerPageContent() {
   =========================================
   */
 
+  /*
+     =========================================
+     PRINT / SAVE AS PDF
+     =========================================
+  */
+
+  function escapePrintHtml(value: unknown): string {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;")
+      .replace(/\n/g, "<br />");
+  }
+
+  function buildPrintCardHtml(printSide: Side): string {
+    const sideElements = elements.filter(
+      (element) => element.side === printSide
+    );
+
+    const elementHtml = sideElements
+      .map((element) => {
+        const commonStyle = [
+          "position:absolute",
+          `left:${element.x}px`,
+          `top:${element.y}px`,
+          `width:${element.width}px`,
+          `height:${element.height}px`,
+          `font-size:${element.fontSize}px`,
+          `font-weight:${element.fontWeight}`,
+          `color:${element.color}`,
+          `background:${element.background}`,
+          `border-radius:${element.borderRadius || 0}px`,
+          "box-sizing:border-box",
+          "overflow:hidden",
+          `z-index:${element.kind === "footer" ? 50 : 60}`,
+          element.background !== "transparent" ? "padding:6px" : "padding:0",
+        ].join(";");
+
+        if (element.kind === "photo") {
+          return `
+            <div style="${commonStyle};border:4px solid #166534;background:#fff;">
+              ${
+                memberPhoto
+                  ? `<img src="${escapePrintHtml(memberPhoto)}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;">👤</div>`
+              }
+            </div>
+          `;
+        }
+
+        if (element.kind === "qr") {
+          return `
+            <div style="${commonStyle};border:4px solid #166534;background:#fff;padding:8px;">
+              ${
+                qrImage
+                  ? `<img src="${escapePrintHtml(qrImage)}" style="width:100%;height:100%;display:block;" />`
+                  : ""
+              }
+            </div>
+          `;
+        }
+
+        if (element.kind === "image") {
+          return `
+            <div style="${commonStyle};">
+              ${
+                element.src
+                  ? `<img src="${escapePrintHtml(element.src)}" style="width:100%;height:100%;object-fit:contain;display:block;" />`
+                  : ""
+              }
+            </div>
+          `;
+        }
+
+        return `
+          <div style="${commonStyle};display:flex;align-items:center;">
+            ${escapePrintHtml(element.text)}
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="print-card-page">
+        <div class="print-card-inner">
+          <div class="print-card-background"></div>
+          <div class="print-card-top"></div>
+          <div class="print-card-bottom"></div>
+          ${elementHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  async function printCard() {
+    if (typeof window === "undefined") return;
+
+    // Always print BOTH sides, regardless of whether the editor is
+    // currently showing FRONT or BACK.
+    document.getElementById("print-container")?.remove();
+
+    const printContainer = document.createElement("div");
+    printContainer.id = "print-container";
+    printContainer.innerHTML = `
+      ${buildPrintCardHtml("front")}
+      ${buildPrintCardHtml("back")}
+    `;
+
+    document.body.appendChild(printContainer);
+
+    // Wait until every photo / QR / uploaded image is ready.
+    const images = Array.from(
+      printContainer.querySelectorAll("img")
+    );
+
+    await Promise.all(
+      images.map(
+        (image) =>
+          image.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                image.onload = () => resolve();
+                image.onerror = () => resolve();
+              })
+      )
+    );
+
+    // Give the browser one layout frame before opening print preview.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    const cleanup = () => {
+      document.getElementById("print-container")?.remove();
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
+
+    window.print();
+  }
+
   function resetDesign() {
     if (locked) return;
 
@@ -1345,7 +1491,128 @@ function NewCardDesignerPageContent() {
   */
 
   return (
-    <AdminGuard>
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: 85.6mm 53.9mm;
+            margin: 0;
+          }
+
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
+          /* Print ONLY the temporary two-card container.
+             The old visibility:hidden approach still kept the full editor
+             in the print flow and caused extra blank pages. */
+          body > *:not(#print-container) {
+            display: none !important;
+          }
+
+          #print-container,
+          #print-container * {
+            visibility: visible !important;
+          }
+
+          #print-container {
+            display: block !important;
+            position: static !important;
+            width: 85.6mm !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          #print-container .print-card-page {
+            display: block !important;
+            position: relative !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            min-width: 85.6mm !important;
+            min-height: 53.9mm !important;
+            max-width: 85.6mm !important;
+            max-height: 53.9mm !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            page-break-before: auto !important;
+            page-break-after: always !important;
+            break-before: auto !important;
+            break-after: page !important;
+          }
+
+          #print-container .print-card-page + .print-card-page {
+            page-break-before: always !important;
+            break-before: page !important;
+          }
+
+          #print-container .print-card-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
+          .print-card-inner {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 856px !important;
+            height: 539px !important;
+            transform: scale(0.3779527559) !important;
+            transform-origin: top left !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            border: 4px solid #075c2b !important;
+            border-radius: 22px !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
+          }
+
+          .print-card-background {
+            position: absolute !important;
+            inset: 0 !important;
+            background: linear-gradient(135deg,#ffffff 0%,#f7fff8 55%,#e8f6df 100%) !important;
+          }
+
+          .print-card-top {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            height: 115px !important;
+            background: linear-gradient(135deg,#ffffff,#f6fff8) !important;
+            border-bottom: 10px solid #075c2b !important;
+          }
+
+          .print-card-bottom {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            height: 150px !important;
+            background: linear-gradient(to top,#d8efc8,transparent) !important;
+            opacity: 0.55 !important;
+          }
+
+          #print-container img {
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          button,
+          input,
+          select,
+          textarea,
+          aside {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      <AdminGuard>
       <main className="min-h-screen bg-slate-100 p-4 md:p-6">
         <div className="max-w-[1500px] mx-auto">
 
@@ -1396,6 +1663,14 @@ function NewCardDesignerPageContent() {
                   }`}
                 >
                   BACK
+                </button>
+
+                <button
+                  type="button"
+                  onClick={printCard}
+                  className="px-5 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700"
+                >
+                  🖨️ Print Front + Back / Save PDF
                 </button>
 
                 {!locked && (
@@ -1511,7 +1786,7 @@ function NewCardDesignerPageContent() {
 
           {/* MAIN GRID */}
 
-          <div className="grid lg:grid-cols-[1fr_340px] gap-5">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
 
             {/* CARD AREA */}
 
@@ -1527,7 +1802,8 @@ function NewCardDesignerPageContent() {
 
                 <div
                   ref={cardRef}
-                  className="relative overflow-hidden select-none shadow-2xl"
+                  data-print-card="true"
+                  className="relative overflow-hidden select-none shadow-2xl print-card"
                   style={{
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT,
@@ -1894,7 +2170,7 @@ function NewCardDesignerPageContent() {
 
             {/* EDIT PANEL */}
 
-            <aside className="bg-white rounded-2xl shadow p-5 h-fit">
+            <aside className="bg-white rounded-2xl shadow p-5 min-h-0 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
 
               <h2 className="text-xl font-extrabold mb-4">
                 ✏️ Edit Selected
@@ -2271,7 +2547,8 @@ function NewCardDesignerPageContent() {
           </div>
         </div>
       </main>
-    </AdminGuard>
+      </AdminGuard>
+    </>
   );
 }
 
