@@ -1634,7 +1634,7 @@ export default function Admin() {
                             {a.status ===
                               "approved" && (
                               <Link
-                                href={`/admin/card?id=${a.id}`}
+                                href={`/admin/card-new?id=${a.id}`}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg"
                               >
                                 Card
