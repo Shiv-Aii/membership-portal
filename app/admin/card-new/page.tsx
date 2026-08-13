@@ -1280,6 +1280,18 @@ function NewCardDesignerPageContent() {
   =========================================
   */
 
+  /*
+     =========================================
+     PRINT / SAVE AS PDF
+     =========================================
+  */
+
+  function printCard() {
+    if (typeof window === "undefined") return;
+
+    window.print();
+  }
+
   function resetDesign() {
     if (locked) return;
 
@@ -1345,7 +1357,62 @@ function NewCardDesignerPageContent() {
   */
 
   return (
-    <AdminGuard>
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: 85.6mm 53.9mm;
+            margin: 0;
+          }
+
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            background: #ffffff !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          [data-print-card="true"],
+          [data-print-card="true"] * {
+            visibility: visible !important;
+          }
+
+          [data-print-card="true"] {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 856px !important;
+            height: 539px !important;
+            min-width: 856px !important;
+            min-height: 539px !important;
+            margin: 0 !important;
+            transform: scale(0.37796) !important;
+            transform-origin: top left !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+
+          [data-print-card="true"] .ring-2 {
+            box-shadow: none !important;
+          }
+
+          button,
+          input,
+          select,
+          textarea,
+          aside {
+            visibility: hidden !important;
+          }
+        }
+      `}</style>
+
+      <AdminGuard>
       <main className="min-h-screen bg-slate-100 p-4 md:p-6">
         <div className="max-w-[1500px] mx-auto">
 
@@ -1396,6 +1463,14 @@ function NewCardDesignerPageContent() {
                   }`}
                 >
                   BACK
+                </button>
+
+                <button
+                  type="button"
+                  onClick={printCard}
+                  className="px-5 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700"
+                >
+                  🖨️ Print / Save PDF
                 </button>
 
                 {!locked && (
@@ -1527,7 +1602,8 @@ function NewCardDesignerPageContent() {
 
                 <div
                   ref={cardRef}
-                  className="relative overflow-hidden select-none shadow-2xl"
+                  data-print-card="true"
+                  className="relative overflow-hidden select-none shadow-2xl print-card"
                   style={{
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT,
@@ -2271,7 +2347,8 @@ function NewCardDesignerPageContent() {
           </div>
         </div>
       </main>
-    </AdminGuard>
+      </AdminGuard>
+    </>
   );
 }
 
