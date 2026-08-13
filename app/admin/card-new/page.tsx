@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
+import { useSearchParams } from "next/navigation";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
@@ -381,105 +381,22 @@ function formatDate(value?: string | null) {
   ).padStart(2, "0")}-${date.getFullYear()}`;
 }
 
-function getMemberText(
-  element: CardElement,
-  member: Member | null
-) {
-  if (!member) {
-    return element.text;
-  }
-
-  const id = element.id.toLowerCase();
-  const label = element.label.toLowerCase();
-
-  const key = `${id} ${label}`;
-
-  if (
-    key.includes("name") ||
-    key.includes("ಹೆಸರು")
-  ) {
-    return member.name || element.text;
-  }
-
-  if (
-    key.includes("membership") ||
-    key.includes("ಸದಸ್ಯತ್ವ")
-  ) {
-    return member.membership_no
-      ? String(member.membership_no)
-      : element.text;
-  }
-
-  if (
-    key.includes("village") ||
-    key.includes("ಗ್ರಾಮ")
-  ) {
-    return member.village || element.text;
-  }
-
-  if (
-    key.includes("taluk") ||
-    key.includes("ತಾಲ್ಲೂಕು")
-  ) {
-    return member.taluk || element.text;
-  }
-
-  if (
-    key.includes("district") ||
-    key.includes("ಜಿಲ್ಲೆ")
-  ) {
-    return member.district || element.text;
-  }
-
-  if (
-    key.includes("mobile") ||
-    key.includes("ಮೊಬೈಲ್")
-  ) {
-    return member.mobile || element.text;
-  }
-
-  if (
-    element.text.includes("{{valid_from}}")
-  ) {
-    return `VALID FROM: ${
-      formatDate(member.valid_from) ||
-      "{{valid_from}}"
-    }`;
-  }
-
-  if (
-    element.text.includes("{{valid_until}}")
-  ) {
-    return `VALID TILL: ${
-      formatDate(member.valid_until) ||
-      "{{valid_until}}"
-    }`;
-  }
-
-  return element.text;
-}
-
 export default function NewCardDesignerPage() {
   const searchParams = useSearchParams();
 
   const memberId = searchParams.get("id");
 
-  const [member, setMember] =
-    useState<Member | null>(null);
+  const [elements, setElements] = useState<CardElement[]>(
+    cloneElements(initialElements)
+  );
 
-  const [loadingMember, setLoadingMember] =
-    useState(true);
-
-  const [elements, setElements] =
-    useState<CardElement[]>(
-      cloneElements(initialElements)
-    );
-
-  const [side, setSide] =
-    useState<Side>("front");
+  const [side, setSide] = useState<Side>("front");
 
   const [selectedId, setSelectedId] =
     useState<string | null>("name");
+
+  const [member, setMember] =
+    useState<Member | null>(null);
 
   const [memberPhoto, setMemberPhoto] =
     useState<string | null>(null);
@@ -496,32 +413,35 @@ export default function NewCardDesignerPage() {
   const [loadingTemplate, setLoadingTemplate] =
     useState(true);
 
+  const [loadingMember, setLoadingMember] =
+    useState(true);
+
   const [saving, setSaving] =
     useState(false);
 
   const cardRef =
     useRef<HTMLDivElement>(null);
 
-  /* =========================
+  /* =====================================================
      LOAD APPROVED MEMBER
-  ========================= */
+  ===================================================== */
 
   useEffect(() => {
     async function loadMember() {
       if (!memberId) {
+        setMember(null);
         setLoadingMember(false);
         return;
       }
 
       setLoadingMember(true);
 
-      const { data, error } =
-        await supabase
-          .from("applications")
-          .select("*")
-          .eq("id", memberId)
-          .eq("status", "approved")
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("id", memberId)
+        .eq("status", "approved")
+        .maybeSingle();
 
       if (error) {
         console.error(
@@ -530,19 +450,21 @@ export default function NewCardDesignerPage() {
         );
 
         alert(
-          "Member data load ಆಗಲಿಲ್ಲ:\n\n" +
+          "Approved Member load ಆಗಲಿಲ್ಲ:\n\n" +
             error.message
         );
 
+        setMember(null);
         setLoadingMember(false);
         return;
       }
 
       if (!data) {
         alert(
-          "Approved member ಸಿಗಲಿಲ್ಲ."
+          "ಈ IDಗೆ Approved Member ಸಿಗಲಿಲ್ಲ."
         );
 
+        setMember(null);
         setLoadingMember(false);
         return;
       }
@@ -552,9 +474,7 @@ export default function NewCardDesignerPage() {
 
       setMember(loadedMember);
 
-      if (
-        loadedMember.photo_url
-      ) {
+      if (loadedMember.photo_url) {
         setMemberPhoto(
           loadedMember.photo_url
         );
@@ -566,29 +486,28 @@ export default function NewCardDesignerPage() {
     loadMember();
   }, [memberId]);
 
-  /* =========================
+  /* =====================================================
      LOAD TEMPLATE
-  ========================= */
+  ===================================================== */
 
   useEffect(() => {
     async function loadTemplate() {
       setLoadingTemplate(true);
 
-      const { data, error } =
-        await supabase
-          .from("card_templates")
-          .select(
-            "id, name, design, is_locked"
-          )
-          .eq(
-            "name",
-            TEMPLATE_NAME
-          )
-          .order("id", {
-            ascending: false,
-          })
-          .limit(1)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from("card_templates")
+        .select(
+          "id, name, design, is_locked"
+        )
+        .eq(
+          "name",
+          TEMPLATE_NAME
+        )
+        .order("id", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error(
@@ -629,24 +548,25 @@ export default function NewCardDesignerPage() {
     loadTemplate();
   }, []);
 
-  /* =========================
-     QR
-  ========================= */
+  /* =====================================================
+     QR CODE
+  ===================================================== */
 
   useEffect(() => {
     async function createQR() {
       try {
-        let membership =
-          member?.membership_no;
+        const membership =
+          member?.membership_no ||
+          "MEMBERSHIP_NUMBER";
 
         const url =
           typeof window !== "undefined"
             ? `${window.location.origin}/verify?membership=${encodeURIComponent(
-                membership
-                  ? String(membership)
-                  : "MEMBERSHIP_NUMBER"
+                String(membership)
               )}`
-            : "https://example.com/verify";
+            : `https://example.com/verify?membership=${encodeURIComponent(
+                String(membership)
+              )}`;
 
         const image =
           await QRCode.toDataURL(
@@ -671,11 +591,206 @@ export default function NewCardDesignerPage() {
     }
 
     createQR();
-  }, [member]);
+  }, [
+    member?.membership_no,
+  ]);
 
-  /* =========================
+  /* =====================================================
+     MEMBER VALUE
+  ===================================================== */
+
+  function getElementText(
+    element: CardElement
+  ) {
+    if (!member) {
+      return element.text;
+    }
+
+    const id =
+      element.id.toLowerCase();
+
+    const label =
+      element.label.toLowerCase();
+
+    const combined =
+      `${id} ${label}`;
+
+    if (
+      id === "name" ||
+      combined.includes("ಹೆಸರು") ||
+      combined.includes("name")
+    ) {
+      return (
+        member.name ||
+        element.text
+      );
+    }
+
+    if (
+      id === "membership" ||
+      combined.includes(
+        "membership"
+      )
+    ) {
+      return member.membership_no
+        ? String(
+            member.membership_no
+          )
+        : element.text;
+    }
+
+    if (
+      id === "village" ||
+      combined.includes("ಗ್ರಾಮ") ||
+      combined.includes("village")
+    ) {
+      return (
+        member.village ||
+        element.text
+      );
+    }
+
+    if (
+      id === "taluk" ||
+      combined.includes("ತಾಲ್ಲೂಕು") ||
+      combined.includes("taluk")
+    ) {
+      return (
+        member.taluk ||
+        element.text
+      );
+    }
+
+    if (
+      id === "district" ||
+      combined.includes("ಜಿಲ್ಲೆ") ||
+      combined.includes("district")
+    ) {
+      return (
+        member.district ||
+        element.text
+      );
+    }
+
+    if (
+      id === "mobile" ||
+      combined.includes("ಮೊಬೈಲ್") ||
+      combined.includes("mobile") ||
+      combined.includes("phone")
+    ) {
+      return (
+        member.mobile ||
+        element.text
+      );
+    }
+
+    if (
+      id === "valid-from" ||
+      id === "back-valid-from" ||
+      combined.includes(
+        "valid from"
+      )
+    ) {
+      if (member.valid_from) {
+        return `VALID FROM: ${formatDate(
+          member.valid_from
+        )}`;
+      }
+
+      return element.text;
+    }
+
+    if (
+      id === "valid-till" ||
+      id === "back-valid-till" ||
+      combined.includes(
+        "valid till"
+      ) ||
+      combined.includes(
+        "valid until"
+      )
+    ) {
+      if (member.valid_until) {
+        return `VALID TILL: ${formatDate(
+          member.valid_until
+        )}`;
+      }
+
+      return element.text;
+    }
+
+    if (
+      combined.includes(
+        "{{valid_from}}"
+      )
+    ) {
+      return element.text.replace(
+        "{{valid_from}}",
+        formatDate(
+          member.valid_from
+        )
+      );
+    }
+
+    if (
+      combined.includes(
+        "{{valid_until}}"
+      )
+    ) {
+      return element.text.replace(
+        "{{valid_until}}",
+        formatDate(
+          member.valid_until
+        )
+      );
+    }
+
+    return element.text
+      .replace(
+        "{{name}}",
+        member.name || ""
+      )
+      .replace(
+        "{{membership_no}}",
+        member.membership_no
+          ? String(
+              member.membership_no
+            )
+          : ""
+      )
+      .replace(
+        "{{village}}",
+        member.village || ""
+      )
+      .replace(
+        "{{taluk}}",
+        member.taluk || ""
+      )
+      .replace(
+        "{{district}}",
+        member.district || ""
+      )
+      .replace(
+        "{{mobile}}",
+        member.mobile || ""
+      )
+      .replace(
+        "{{valid_from}}",
+        formatDate(
+          member.valid_from
+        )
+      )
+      .replace(
+        "{{valid_until}}",
+        formatDate(
+          member.valid_until
+        )
+      );
+  }
+
+  /* =====================================================
      UPDATE
-  ========================= */
+  ===================================================== */
 
   function updateElement(
     id: string,
@@ -695,9 +810,9 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* =========================
+  /* =====================================================
      DELETE
-  ========================= */
+  ===================================================== */
 
   function deleteElement(
     id: string
@@ -714,9 +829,9 @@ export default function NewCardDesignerPage() {
     setSelectedId(null);
   }
 
-  /* =========================
+  /* =====================================================
      DRAG
-  ========================= */
+  ===================================================== */
 
   function handlePointerDown(
     event: React.PointerEvent,
@@ -748,7 +863,9 @@ export default function NewCardDesignerPage() {
 
     if (!rect) return;
 
-    function move(e: PointerEvent) {
+    function move(
+      e: PointerEvent
+    ) {
       const scaleX =
         rect!.width /
         CARD_WIDTH;
@@ -814,9 +931,9 @@ export default function NewCardDesignerPage() {
     );
   }
 
-  /* =========================
+  /* =====================================================
      ADD TEXT
-  ========================= */
+  ===================================================== */
 
   function addText() {
     if (locked) return;
@@ -835,23 +952,24 @@ export default function NewCardDesignerPage() {
         fontSize: 20,
         fontWeight: "600",
         color: "#111111",
-        background:
-          "transparent",
+        background: "transparent",
       };
 
-    setElements((current) => [
-      ...current,
-      newElement,
-    ]);
+    setElements(
+      (current) => [
+        ...current,
+        newElement,
+      ]
+    );
 
     setSelectedId(
       newElement.id
     );
   }
 
-  /* =========================
+  /* =====================================================
      ADD IMAGE
-  ========================= */
+  ===================================================== */
 
   async function addImage(
     event: React.ChangeEvent<HTMLInputElement>
@@ -883,16 +1001,17 @@ export default function NewCardDesignerPage() {
           fontSize: 18,
           fontWeight: "600",
           color: "#111111",
-          background:
-            "#ffffff",
+          background: "#ffffff",
           borderRadius: 10,
           src: dataUrl,
         };
 
-      setElements((current) => [
-        ...current,
-        newElement,
-      ]);
+      setElements(
+        (current) => [
+          ...current,
+          newElement,
+        ]
+      );
 
       setSelectedId(
         newElement.id
@@ -908,9 +1027,9 @@ export default function NewCardDesignerPage() {
     event.target.value = "";
   }
 
-  /* =========================
+  /* =====================================================
      MEMBER PHOTO
-  ========================= */
+  ===================================================== */
 
   async function uploadMemberPhoto(
     event: React.ChangeEvent<HTMLInputElement>
@@ -945,14 +1064,18 @@ export default function NewCardDesignerPage() {
       }
     } catch (error) {
       console.error(error);
+
+      alert(
+        "Photo load ಆಗಲಿಲ್ಲ."
+      );
     }
 
     event.target.value = "";
   }
 
-  /* =========================
+  /* =====================================================
      SAVE TEMPLATE
-  ========================= */
+  ===================================================== */
 
   async function saveTemplate() {
     if (locked) {
@@ -993,11 +1116,13 @@ export default function NewCardDesignerPage() {
               templateId
             );
 
-        if (error) {
+        if (error)
           throw error;
-        }
       } else {
-        const { data, error } =
+        const {
+          data,
+          error,
+        } =
           await supabase
             .from(
               "card_templates"
@@ -1012,9 +1137,8 @@ export default function NewCardDesignerPage() {
             .select("id")
             .single();
 
-        if (error) {
+        if (error)
           throw error;
-        }
 
         if (data?.id) {
           setTemplateId(
@@ -1039,9 +1163,9 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =========================
+  /* =====================================================
      LOCK
-  ========================= */
+  ===================================================== */
 
   async function lockTemplate() {
     if (saving) return;
@@ -1089,9 +1213,8 @@ export default function NewCardDesignerPage() {
             templateId
           );
 
-      if (error) {
+      if (error)
         throw error;
-      }
 
       setLocked(true);
 
@@ -1111,12 +1234,13 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =========================
+  /* =====================================================
      UNLOCK
-  ========================= */
+  ===================================================== */
 
   async function unlockTemplate() {
-    if (!templateId) return;
+    if (!templateId)
+      return;
 
     const ok = confirm(
       "🔓 Template Unlock ಮಾಡಬೇಕೇ?"
@@ -1143,9 +1267,8 @@ export default function NewCardDesignerPage() {
             templateId
           );
 
-      if (error) {
+      if (error)
         throw error;
-      }
 
       setLocked(false);
 
@@ -1165,9 +1288,9 @@ export default function NewCardDesignerPage() {
     }
   }
 
-  /* =========================
+  /* =====================================================
      RESET
-  ========================= */
+  ===================================================== */
 
   function resetDesign() {
     if (locked) return;
@@ -1201,9 +1324,9 @@ export default function NewCardDesignerPage() {
         selectedId
     ) || null;
 
-  /* =========================
+  /* =====================================================
      LOADING
-  ========================= */
+  ===================================================== */
 
   if (
     loadingTemplate ||
@@ -1211,9 +1334,8 @@ export default function NewCardDesignerPage() {
   ) {
     return (
       <AdminGuard>
-        <main className="min-h-screen flex items-center justify-center bg-slate-100">
+        <main className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
           <div className="bg-white rounded-2xl shadow p-8 text-center">
-
             <div className="text-3xl mb-3">
               ⏳
             </div>
@@ -1223,50 +1345,46 @@ export default function NewCardDesignerPage() {
                 ? "Member Loading..."
                 : "Card Template Loading..."}
             </div>
-
           </div>
         </main>
       </AdminGuard>
     );
   }
 
-  /* =========================
-     NO MEMBER ID
-  ========================= */
+  /* =====================================================
+     NO MEMBER
+  ===================================================== */
 
-  if (!memberId) {
+  if (!memberId || !member) {
     return (
       <AdminGuard>
-        <main className="min-h-screen flex items-center justify-center bg-slate-100 p-5">
-
-          <div className="bg-white rounded-2xl shadow p-8 text-center max-w-md">
-
+        <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow p-8 text-center max-w-lg">
             <div className="text-5xl mb-4">
               ⚠️
             </div>
 
             <h1 className="text-2xl font-extrabold">
-              Member ID Missing
+              Approved Member ಸಿಗಲಿಲ್ಲ
             </h1>
 
             <p className="text-slate-500 mt-3">
-              Approved memberನ Card buttonನಿಂದ ಈ page open ಮಾಡಿ.
+              Admin Dashboardನ Approved
+              Memberನ Card button ಮೂಲಕ
+              ಈ page open ಮಾಡಿ.
             </p>
-
           </div>
-
         </main>
       </AdminGuard>
     );
   }
 
-  /* =========================
+  /* =====================================================
      PAGE
-  ========================= */
+  ===================================================== */
 
   return (
     <AdminGuard>
-
       <main className="min-h-screen bg-slate-100 p-4 md:p-6">
 
         <div className="max-w-[1500px] mx-auto">
@@ -1286,6 +1404,17 @@ export default function NewCardDesignerPage() {
                 <p className="text-slate-500">
                   Card ಅನ್ನು ನಿಮ್ಮ ಇಷ್ಟದಂತೆ design ಮಾಡಿ
                 </p>
+
+                <div className="mt-2 text-sm">
+                  <b>Member:</b>{" "}
+                  {member.name || "-"}
+                  {"  "}
+                  <span className="text-slate-500">
+                    Membership No:{" "}
+                    {member.membership_no ||
+                      "-"}
+                  </span>
+                </div>
 
               </div>
 
@@ -1332,50 +1461,6 @@ export default function NewCardDesignerPage() {
 
             </div>
 
-            {/* MEMBER INFO */}
-
-            {member && (
-              <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
-
-                <div className="font-bold text-green-800 mb-2">
-                  👤 Approved Member
-                </div>
-
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
-
-                  <div>
-                    <b>Name:</b>{" "}
-                    {member.name ||
-                      "-"}
-                  </div>
-
-                  <div>
-                    <b>Membership:</b>{" "}
-                    {member.membership_no ||
-                      "-"}
-                  </div>
-
-                  <div>
-                    <b>Valid From:</b>{" "}
-                    {formatDate(
-                      member.valid_from
-                    ) ||
-                      "-"}
-                  </div>
-
-                  <div>
-                    <b>Valid Till:</b>{" "}
-                    {formatDate(
-                      member.valid_until
-                    ) ||
-                      "-"}
-                  </div>
-
-                </div>
-
-              </div>
-            )}
-
             {/* TEMPLATE STATUS */}
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
@@ -1396,7 +1481,6 @@ export default function NewCardDesignerPage() {
 
                 {!locked && (
                   <>
-
                     <button
                       onClick={
                         addText
@@ -1407,7 +1491,6 @@ export default function NewCardDesignerPage() {
                     </button>
 
                     <label className="px-4 py-2 rounded-lg bg-purple-600 text-white font-bold cursor-pointer">
-
                       🖼️ Add Image
 
                       <input
@@ -1418,7 +1501,6 @@ export default function NewCardDesignerPage() {
                         }
                         className="hidden"
                       />
-
                     </label>
 
                     <button
@@ -1446,7 +1528,6 @@ export default function NewCardDesignerPage() {
                     >
                       🔒 Lock Template
                     </button>
-
                   </>
                 )}
 
@@ -1470,11 +1551,109 @@ export default function NewCardDesignerPage() {
 
           </div>
 
-          {/* MAIN GRID */}
+          {/* MEMBER INFO */}
+
+          <div className="bg-white rounded-2xl shadow p-4 mb-5">
+
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-sm">
+
+              <div>
+                <div className="text-slate-500">
+                  Name
+                </div>
+
+                <div className="font-bold">
+                  {member.name ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Membership
+                </div>
+
+                <div className="font-bold">
+                  {member.membership_no ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Village
+                </div>
+
+                <div className="font-bold">
+                  {member.village ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Taluk
+                </div>
+
+                <div className="font-bold">
+                  {member.taluk ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  District
+                </div>
+
+                <div className="font-bold">
+                  {member.district ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Mobile
+                </div>
+
+                <div className="font-bold">
+                  {member.mobile ||
+                    "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Valid From
+                </div>
+
+                <div className="font-bold text-green-700">
+                  {formatDate(
+                    member.valid_from
+                  ) || "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-slate-500">
+                  Valid Till
+                </div>
+
+                <div className="font-bold text-green-700">
+                  {formatDate(
+                    member.valid_until
+                  ) || "-"}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
 
           <div className="grid lg:grid-cols-[1fr_340px] gap-5">
 
-            {/* CARD */}
+            {/* CARD AREA */}
 
             <section className="bg-slate-200 rounded-2xl p-4 md:p-8 overflow-auto">
 
@@ -1503,7 +1682,8 @@ export default function NewCardDesignerPage() {
                     border:
                       "4px solid #075c2b",
 
-                    borderRadius: 22,
+                    borderRadius:
+                      22,
 
                     touchAction:
                       "none",
@@ -1590,7 +1770,8 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex: 30,
+                              zIndex:
+                                30,
 
                               touchAction:
                                 "none",
@@ -1672,7 +1853,8 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex: 40,
+                              zIndex:
+                                40,
 
                               touchAction:
                                 "none",
@@ -1696,7 +1878,7 @@ export default function NewCardDesignerPage() {
                         );
                       }
 
-                      /* IMAGE */
+                      /* STATIC IMAGE */
 
                       if (
                         element.kind ===
@@ -1745,7 +1927,8 @@ export default function NewCardDesignerPage() {
                               borderRadius:
                                 element.borderRadius,
 
-                              zIndex: 25,
+                              zIndex:
+                                25,
 
                               touchAction:
                                 "none",
@@ -1840,9 +2023,8 @@ export default function NewCardDesignerPage() {
                               "none",
                           }}
                         >
-                          {getMemberText(
-                            element,
-                            member
+                          {getElementText(
+                            element
                           )}
                         </div>
                       );
@@ -1869,25 +2051,6 @@ export default function NewCardDesignerPage() {
                 ✏️ Edit Selected
               </h2>
 
-              {/* MEMBER */}
-
-              {member && (
-                <div className="mb-5 bg-green-50 border border-green-200 rounded-xl p-3">
-
-                  <div className="font-bold text-green-800">
-                    {member.name ||
-                      "Member"}
-                  </div>
-
-                  <div className="text-sm text-green-700 mt-1">
-                    Membership:{" "}
-                    {member.membership_no ||
-                      "-"}
-                  </div>
-
-                </div>
-              )}
-
               {/* MEMBER PHOTO */}
 
               <div className="mb-5">
@@ -1907,6 +2070,13 @@ export default function NewCardDesignerPage() {
                   }
                   className="w-full text-sm"
                 />
+
+                {member.photo_url &&
+                  !memberPhoto && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      Member photo databaseನಲ್ಲಿ ಇದೆ.
+                    </p>
+                  )}
 
               </div>
 
@@ -1933,7 +2103,6 @@ export default function NewCardDesignerPage() {
                   }
                   className="w-full border rounded-lg px-3 py-2"
                 >
-
                   <option value="">
                     Select field
                   </option>
@@ -1945,7 +2114,9 @@ export default function NewCardDesignerPage() {
                         side
                     )
                     .map(
-                      (element) => (
+                      (
+                        element
+                      ) => (
                         <option
                           key={
                             element.id
@@ -2026,13 +2197,14 @@ export default function NewCardDesignerPage() {
                               selected.id,
                               {
                                 text:
-                                  e
-                                    .target
+                                  e.target
                                     .value,
                               }
                             )
                           }
-                          rows={3}
+                          rows={
+                            3
+                          }
                           className="w-full border rounded-lg p-2"
                         />
 
@@ -2061,7 +2233,9 @@ export default function NewCardDesignerPage() {
                           disabled={
                             locked
                           }
-                          onChange={(e) =>
+                          onChange={(
+                            e
+                          ) =>
                             updateElement(
                               selected.id,
                               {
@@ -2080,7 +2254,7 @@ export default function NewCardDesignerPage() {
                       </div>
                     )}
 
-                  {/* COLOR */}
+                  {/* FONT COLOR */}
 
                   {selected.kind !==
                     "photo" &&
@@ -2102,13 +2276,14 @@ export default function NewCardDesignerPage() {
                           disabled={
                             locked
                           }
-                          onChange={(e) =>
+                          onChange={(
+                            e
+                          ) =>
                             updateElement(
                               selected.id,
                               {
                                 color:
-                                  e
-                                    .target
+                                  e.target
                                     .value,
                               }
                             )
@@ -2140,8 +2315,7 @@ export default function NewCardDesignerPage() {
                           selected.id,
                           {
                             x: Number(
-                              e
-                                .target
+                              e.target
                                 .value
                             ),
                           }
@@ -2173,8 +2347,7 @@ export default function NewCardDesignerPage() {
                           selected.id,
                           {
                             y: Number(
-                              e
-                                .target
+                              e.target
                                 .value
                             ),
                           }
@@ -2207,8 +2380,7 @@ export default function NewCardDesignerPage() {
                           {
                             width:
                               Number(
-                                e
-                                  .target
+                                e.target
                                   .value
                               ),
                           }
@@ -2241,8 +2413,7 @@ export default function NewCardDesignerPage() {
                           {
                             height:
                               Number(
-                                e
-                                  .target
+                                e.target
                                   .value
                               ),
                           }
@@ -2278,7 +2449,6 @@ export default function NewCardDesignerPage() {
         </div>
 
       </main>
-
     </AdminGuard>
   );
 }
