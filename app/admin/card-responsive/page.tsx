@@ -1617,6 +1617,12 @@ function NewCardDesignerPageContent() {
             min-width: 85.6mm !important;
             max-width: 85.6mm !important;
             background: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          body {
+            overflow: visible !important;
           }
 
           body > *:not(#print-container) {
@@ -1625,10 +1631,15 @@ function NewCardDesignerPageContent() {
 
           #print-container {
             display: block !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 85.6mm !important;
+            height: 107.8mm !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
+            z-index: 2147483647 !important;
           }
 
           #print-container,
@@ -1655,6 +1666,7 @@ function NewCardDesignerPageContent() {
             break-after: page !important;
             page-break-before: auto !important;
             break-before: auto !important;
+            visibility: visible !important;
           }
 
           #print-container .print-card-page:last-child {
