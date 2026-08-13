@@ -1463,11 +1463,11 @@ function NewCardDesignerPageContent() {
       .join("");
 
     return `
-      <section class="card-pdf-page">
-        <div class="card-pdf-inner">
-          <div class="card-pdf-background"></div>
-          <div class="card-pdf-top"></div>
-          <div class="card-pdf-bottom"></div>
+      <section class="print-card-page">
+        <div class="print-card-inner">
+          <div class="print-card-background"></div>
+          <div class="print-card-top"></div>
+          <div class="print-card-bottom"></div>
           ${elementHtml}
         </div>
       </section>
