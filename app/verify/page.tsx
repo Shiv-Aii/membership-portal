@@ -391,8 +391,8 @@ function VerifyPageContent() {
 
           <button
             type="button"
-            onClick={
-              verifyMember
+            onClick={() =>
+              verifyMember()
             }
             disabled={loading}
             className="
