@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
 
 import QRCode from "qrcode";
 import AdminGuard from "@/components/AdminGuard";
@@ -45,6 +46,178 @@ const CARD_WIDTH = 856;
 const CARD_HEIGHT = 539;
 
 const TEMPLATE_NAME = "Farmer PVC Card";
+
+/* ==================================================
+   MEMBER DATA
+   The card-new page is opened as /admin/card-new?id=<UUID>.
+   We try the common member/application tables and map
+   whichever columns exist to the card fields.
+================================================== */
+
+type MemberRecord = Record<string, any>;
+
+const MEMBER_TABLES = [
+  "members",
+  "applications",
+  "membership_applications",
+  "member_applications",
+  "member_profiles",
+];
+
+function firstValue(
+  row: MemberRecord | null | undefined,
+  keys: string[]
+): any {
+  if (!row) return null;
+
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function textValue(
+  row: MemberRecord | null | undefined,
+  keys: string[],
+  fallback: string
+): string {
+  const value = firstValue(row, keys);
+  return value === null ? fallback : String(value);
+}
+
+function dateValue(
+  row: MemberRecord | null | undefined,
+  keys: string[],
+  fallback: string
+): string {
+  const value = firstValue(row, keys);
+  if (!value) return fallback;
+
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function applyMemberDataToElements(
+  current: CardElement[],
+  member: MemberRecord
+): CardElement[] {
+  const name = textValue(
+    member,
+    [
+      "full_name",
+      "member_name",
+      "applicant_name",
+      "name",
+      "kannada_name",
+      "fullName",
+    ],
+    "ಸದಸ್ಯರ ಹೆಸರು"
+  );
+
+  const membership = textValue(
+    member,
+    [
+      "membership_number",
+      "membership_no",
+      "member_number",
+      "member_no",
+      "membership_id",
+      "card_number",
+    ],
+    "Membership Number"
+  );
+
+  const village = textValue(
+    member,
+    ["village", "village_name", "gram", "gram_name"],
+    "ಗ್ರಾಮದ ಹೆಸರು"
+  );
+
+  const taluk = textValue(
+    member,
+    ["taluk", "taluk_name", "talukName"],
+    "ತಾಲ್ಲೂಕಿನ ಹೆಸರು"
+  );
+
+  const district = textValue(
+    member,
+    ["district", "district_name", "districtName"],
+    "ಜಿಲ್ಲೆಯ ಹೆಸರು"
+  );
+
+  const mobile = textValue(
+    member,
+    [
+      "mobile",
+      "mobile_number",
+      "phone",
+      "phone_number",
+      "contact_number",
+    ],
+    "9980XXXXXX"
+  );
+
+  const validFrom = dateValue(
+    member,
+    [
+      "valid_from",
+      "valid_from_date",
+      "membership_from",
+      "start_date",
+      "approved_date",
+      "approval_date",
+    ],
+    "13-08-2026"
+  );
+
+  const validTill = dateValue(
+    member,
+    [
+      "valid_till",
+      "valid_till_date",
+      "valid_until",
+      "expiry_date",
+      "membership_expiry",
+      "expires_at",
+      "end_date",
+    ],
+    "12-08-2027"
+  );
+
+  return current.map((element) => {
+    switch (element.id) {
+      case "name":
+        return { ...element, text: name };
+      case "membership":
+        return { ...element, text: membership };
+      case "village":
+        return { ...element, text: village };
+      case "taluk":
+        return { ...element, text: taluk };
+      case "district":
+        return { ...element, text: district };
+      case "mobile":
+        return { ...element, text: mobile };
+      case "valid-from":
+      case "back-valid-from":
+        return { ...element, text: `VALID FROM: ${validFrom}` };
+      case "valid-till":
+      case "back-valid-till":
+        return { ...element, text: `VALID TILL: ${validTill}` };
+      default:
+        return element;
+    }
+  });
+}
 
 const initialElements: CardElement[] = [
   {
@@ -401,6 +574,20 @@ function NewCardDesignerPageContent() {
 
   const [saving, setSaving] = useState(false);
 
+  const searchParams = useSearchParams();
+  const memberId =
+    searchParams.get("id") ||
+    searchParams.get("member_id") ||
+    searchParams.get("application_id") ||
+    "";
+
+  const [memberData, setMemberData] =
+    useState<MemberRecord | null>(null);
+  const [memberLoading, setMemberLoading] =
+    useState(false);
+  const [memberError, setMemberError] =
+    useState("");
+
   const cardRef = useRef<HTMLDivElement>(null);
 
   /*
@@ -474,6 +661,98 @@ function NewCardDesignerPageContent() {
 
   /*
   =========================================
+  LOAD MEMBER DETAILS
+  =========================================
+  */
+
+  useEffect(() => {
+    if (!memberId) {
+      setMemberLoading(false);
+      setMemberError("Card URL ನಲ್ಲಿ member id ಇಲ್ಲ.");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadMember() {
+      setMemberLoading(true);
+      setMemberError("");
+
+      try {
+        let found: MemberRecord | null = null;
+
+        for (const table of MEMBER_TABLES) {
+          try {
+            const { data, error } = await supabase
+              .from(table)
+              .select("*")
+              .eq("id", memberId)
+              .maybeSingle();
+
+            if (!error && data) {
+              found = data as MemberRecord;
+              break;
+            }
+          } catch (tableError) {
+            console.warn(`Member table ${table} could not be read`, tableError);
+          }
+        }
+
+        if (cancelled) return;
+
+        if (!found) {
+          setMemberData(null);
+          setMemberError(
+            "ಈ ID ಗೆ member details ಸಿಗಲಿಲ್ಲ. Member page ನಿಂದ ಬಂದ ಅದೇ id ಬಳಸಬೇಕು."
+          );
+          return;
+        }
+
+        setMemberData(found);
+        setElements((current) =>
+          applyMemberDataToElements(current, found as MemberRecord)
+        );
+
+        const photo = firstValue(found, [
+          "photo_url",
+          "photo",
+          "profile_photo",
+          "profile_photo_url",
+          "member_photo",
+          "image_url",
+          "image",
+          "photo_path",
+        ]);
+
+        if (photo && typeof photo === "string") {
+          if (photo.startsWith("data:") || photo.startsWith("http://") || photo.startsWith("https://")) {
+            setMemberPhoto(photo);
+          } else {
+            // If the database stores a public Supabase URL/path, use it as-is.
+            setMemberPhoto(photo);
+          }
+        }
+      } catch (error: any) {
+        console.error("Member load error:", error);
+        if (!cancelled) {
+          setMemberError(
+            error?.message || "Member details load ಆಗಲಿಲ್ಲ."
+          );
+        }
+      } finally {
+        if (!cancelled) setMemberLoading(false);
+      }
+    }
+
+    loadMember();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [memberId]);
+
+  /*
+  =========================================
   QR CODE
   =========================================
   */
@@ -481,10 +760,23 @@ function NewCardDesignerPageContent() {
   useEffect(() => {
     async function createQR() {
       try {
+        const membershipNumber = textValue(
+          memberData,
+          [
+            "membership_number",
+            "membership_no",
+            "member_number",
+            "member_no",
+            "membership_id",
+            "card_number",
+          ],
+          memberId || "MEMBERSHIP_NUMBER"
+        );
+
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?membership=MEMBERSHIP_NUMBER`
-            : "https://example.com/verify";
+            ? `${window.location.origin}/verify?membership=${encodeURIComponent(membershipNumber)}`
+            : `https://example.com/verify?membership=${encodeURIComponent(membershipNumber)}`;
 
         const image =
           await QRCode.toDataURL(
@@ -509,7 +801,7 @@ function NewCardDesignerPageContent() {
     }
 
     createQR();
-  }, []);
+  }, [memberData, memberId]);
 
   /*
   =========================================
@@ -1071,6 +1363,11 @@ function NewCardDesignerPageContent() {
                 <p className="text-slate-500">
                   Card ಅನ್ನು ನಿಮ್ಮ ಇಷ್ಟದಂತೆ design ಮಾಡಿ
                 </p>
+                {memberId && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Member ID: {memberId}
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1128,6 +1425,26 @@ function NewCardDesignerPageContent() {
                 {locked
                   ? "🔒 TEMPLATE LOCKED"
                   : "🟢 TEMPLATE EDITABLE"}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {memberLoading && (
+                  <div className="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 font-bold">
+                    ⏳ Member Loading...
+                  </div>
+                )}
+
+                {memberData && !memberLoading && (
+                  <div className="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 font-bold">
+                    👤 Member Details Loaded
+                  </div>
+                )}
+
+                {memberError && !memberLoading && (
+                  <div className="px-4 py-2 rounded-lg bg-red-100 text-red-700 font-bold text-sm">
+                    ⚠️ {memberError}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
