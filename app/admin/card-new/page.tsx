@@ -1506,8 +1506,19 @@ function NewCardDesignerPageContent() {
             background: #ffffff !important;
           }
 
-          body * {
-            visibility: hidden !important;
+          /* Print ONLY the dedicated two-card container.
+             Do not use visibility:hidden for the whole app because hidden
+             elements still participate in print layout and can create
+             extra blank pages. */
+          body > *:not(#print-container) {
+            display: none !important;
+          }
+
+          html,
+          body {
+            width: 85.6mm !important;
+            min-width: 85.6mm !important;
+            max-width: 85.6mm !important;
           }
 
           #print-container,
@@ -1518,34 +1529,35 @@ function NewCardDesignerPageContent() {
           #print-container {
             display: block !important;
             position: static !important;
-            width: 100% !important;
-            height: auto !important;
+            width: 85.6mm !important;
+            height: 107.8mm !important;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: visible !important;
           }
 
           #print-container .print-card-page {
             display: block !important;
             position: relative !important;
-            width: 100% !important;
-            height: auto !important;
-            aspect-ratio: 856 / 539 !important;
-            min-width: 0 !important;
-            min-height: 0 !important;
-            max-width: none !important;
-            max-height: none !important;
+            width: 85.6mm !important;
+            height: 53.9mm !important;
+            min-width: 85.6mm !important;
+            min-height: 53.9mm !important;
+            max-width: 85.6mm !important;
+            max-height: 53.9mm !important;
             overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
-            page-break-before: always !important;
+            box-sizing: border-box !important;
+            page-break-before: auto !important;
             page-break-after: always !important;
-            break-before: page !important;
+            break-before: auto !important;
             break-after: page !important;
           }
 
-          #print-container .print-card-page:first-child {
-            page-break-before: auto !important;
-            break-before: auto !important;
+          #print-container .print-card-page + .print-card-page {
+            page-break-before: always !important;
+            break-before: page !important;
           }
 
           #print-container .print-card-page:last-child {
@@ -1559,7 +1571,7 @@ function NewCardDesignerPageContent() {
             top: 0 !important;
             width: 856px !important;
             height: 539px !important;
-            transform: scale(calc(100vw / 856px)) !important;
+            transform: scale(0.3779527559) !important;
             transform-origin: top left !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
