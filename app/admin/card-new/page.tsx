@@ -1479,256 +1479,64 @@ function NewCardDesignerPageContent() {
 
     /*
      * IMPORTANT:
-     * Do not print the existing Next.js page.
-     * Open a clean print window containing ONLY the two PVC cards.
-     *
-     * Card size:
-     * 85.6 mm × 53.9 mm (standard CR80/PVC card size)
+     * Do NOT use window.open() here.
+     * Chrome/Android can block it as a popup even when the button
+     * click is valid. Instead, create a temporary print-only container
+     * in the current document and let window.print() handle Save as PDF.
      *
      * Page 1 = FRONT
      * Page 2 = BACK
+     * Size = 85.6mm × 53.9mm (CR80 PVC card)
      */
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "width=1000,height=800,noopener,noreferrer"
-    );
+    document.getElementById("print-container")?.remove();
 
-    if (!printWindow) {
-      alert(
-        "PDF window open ಆಗಲಿಲ್ಲ.\n\nBrowser ನಲ್ಲಿ pop-up permission Allow ಮಾಡಿ, ನಂತರ ಮತ್ತೆ PDF button ಒತ್ತಿ."
-      );
-      return;
-    }
-
-    const printHtml = `
-      <!doctype html>
-      <html lang="kn">
-        <head>
-          <meta charset="UTF-8" />
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1.0"
-          />
-          <title>${escapePrintHtml(TEMPLATE_NAME)} - PDF</title>
-
-          <style>
-            @page {
-              size: 85.6mm 53.9mm;
-              margin: 0;
-            }
-
-            * {
-              box-sizing: border-box;
-            }
-
-            html,
-            body {
-              margin: 0 !important;
-              padding: 0 !important;
-              width: 85.6mm !important;
-              min-width: 85.6mm !important;
-              max-width: 85.6mm !important;
-              background: #ffffff !important;
-            }
-
-            body {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              font-family: Arial, "Noto Sans Kannada", "Noto Sans", sans-serif;
-            }
-
-            .card-pdf-page {
-              position: relative;
-              width: 85.6mm;
-              height: 53.9mm;
-              min-width: 85.6mm;
-              min-height: 53.9mm;
-              max-width: 85.6mm;
-              max-height: 53.9mm;
-              overflow: hidden;
-              margin: 0;
-              padding: 0;
-              page-break-after: always;
-              break-after: page;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-
-            .card-pdf-page:last-child {
-              page-break-after: auto;
-              break-after: auto;
-            }
-
-            /*
-             * The editor uses 856 × 539 CSS pixels.
-             * 85.6 × 53.9 mm at 96 DPI is approximately
-             * 323.15 × 203.53 CSS pixels.
-             *
-             * 323.15 / 856 = 0.37751
-             * 203.53 / 539 = 0.37742
-             *
-             * Use the exact physical card ratio so the whole
-             * card fits inside the PVC page without A4 scaling.
-             */
-            .card-pdf-inner {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 856px;
-              height: 539px;
-              transform: scale(0.3779527559);
-              transform-origin: top left;
-              overflow: hidden;
-              box-sizing: border-box;
-              border: 4px solid #075c2b;
-              border-radius: 22px;
-              background: linear-gradient(
-                135deg,
-                #ffffff 0%,
-                #f7fff8 55%,
-                #e8f6df 100%
-              );
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            .card-pdf-background {
-              position: absolute;
-              inset: 0;
-              background: linear-gradient(
-                135deg,
-                #ffffff 0%,
-                #f7fff8 55%,
-                #e8f6df 100%
-              );
-              z-index: 1;
-            }
-
-            .card-pdf-top {
-              position: absolute;
-              left: 0;
-              right: 0;
-              top: 0;
-              height: 115px;
-              background: linear-gradient(
-                135deg,
-                #ffffff,
-                #f6fff8
-              );
-              border-bottom: 10px solid #075c2b;
-              z-index: 2;
-            }
-
-            .card-pdf-bottom {
-              position: absolute;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              height: 150px;
-              background: linear-gradient(
-                to top,
-                #d8efc8,
-                transparent
-              );
-              opacity: 0.55;
-              z-index: 2;
-            }
-
-            .card-pdf-inner img {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            @media screen {
-              body {
-                width: 100vw !important;
-                min-width: 0 !important;
-                max-width: none !important;
-                background: #e5e7eb !important;
-              }
-
-              .card-pdf-page {
-                margin: 20px auto;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-              }
-            }
-
-            @media print {
-              html,
-              body {
-                width: 85.6mm !important;
-                min-width: 85.6mm !important;
-                max-width: 85.6mm !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                background: #ffffff !important;
-              }
-
-              .card-pdf-page {
-                margin: 0 !important;
-              }
-            }
-          </style>
-        </head>
-
-        <body>
-          ${buildPrintCardHtml("front")}
-          ${buildPrintCardHtml("back")}
-
-          <script>
-            (async function () {
-              const images = Array.from(document.images);
-
-              await Promise.all(
-                images.map((img) => {
-                  if (img.complete) {
-                    return Promise.resolve();
-                  }
-
-                  return new Promise((resolve) => {
-                    img.addEventListener("load", resolve, {
-                      once: true
-                    });
-
-                    img.addEventListener("error", resolve, {
-                      once: true
-                    });
-                  });
-                })
-              );
-
-              if (document.fonts && document.fonts.ready) {
-                try {
-                  await document.fonts.ready;
-                } catch (e) {}
-              }
-
-              setTimeout(function () {
-                window.focus();
-                window.print();
-              }, 300);
-            })();
-          </script>
-        </body>
-      </html>
+    const printContainer = document.createElement("div");
+    printContainer.id = "print-container";
+    printContainer.innerHTML = `
+      ${buildPrintCardHtml("front")}
+      ${buildPrintCardHtml("back")}
     `;
 
-    printWindow.document.open();
-    printWindow.document.write(printHtml);
-    printWindow.document.close();
+    document.body.appendChild(printContainer);
 
-    /*
-     * After printing, close the temporary print window.
-     * A small delay gives Chrome time to finish Save as PDF.
-     */
-    printWindow.onafterprint = () => {
-      setTimeout(() => {
-        try {
-          printWindow.close();
-        } catch {}
-      }, 300);
+    // Wait for all photos / QR / uploaded images.
+    const images = Array.from(
+      printContainer.querySelectorAll("img")
+    );
+
+    await Promise.all(
+      images.map(
+        (image) =>
+          image.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                image.onload = () => resolve();
+                image.onerror = () => resolve();
+              })
+      )
+    );
+
+    if (document.fonts?.ready) {
+      try {
+        await document.fonts.ready;
+      } catch {}
+    }
+
+    // Give the browser two layout frames before opening Print Preview.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    const cleanup = () => {
+      document.getElementById("print-container")?.remove();
+      window.removeEventListener("afterprint", cleanup);
     };
+
+    window.addEventListener("afterprint", cleanup);
+
+    window.print();
   }
 
   function resetDesign() {
