@@ -11,12 +11,21 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://membership-portal-zeta.vercel.app",
     siteName: "Membership Portal",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1008,
+        height: 1536,
+        alt: "Organization Membership Portal",
+      },
+    ],
   },
 
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Membership Portal",
     description: "Organization Membership & PVC ID Card Portal",
+    images: ["/og-image.png"],
   },
 };
 
