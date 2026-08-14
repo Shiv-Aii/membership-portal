@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --brand: #16a34a;
+  --brand2: #2563eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  min-width: 320px;
+  font-family: Arial, "Noto Sans Kannada", sans-serif;
+  background: #f6f8fb;
+  color: #172033;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.card-shadow {
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+}
+
+.pvc {
+  width: 323px;
+  height: 203px;
+  max-width: 100%;
+}
+
+/* Keep intentionally wide editor/table areas usable on small screens. */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    min-width: 0;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
