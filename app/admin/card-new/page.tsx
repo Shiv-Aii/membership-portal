@@ -237,7 +237,7 @@ function applyMemberDataToElements(
       case "mobile":
         return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
       case "aadhaar":
-        return { ...element, text: `ಆಧಾರ : ${aadhaar}` };
+        return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
