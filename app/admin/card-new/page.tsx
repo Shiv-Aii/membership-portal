@@ -238,7 +238,8 @@ function applyMemberDataToElements(
         return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
       case "aadhaar":
         return { ...element, text: `ಆಧಾರ : ${aadhaar}` };
-
+      case "valid-from":
+      case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
       case "valid-till":
       case "back-valid-till":
@@ -474,38 +475,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
     borderRadius: 12,
-  },
-
-  {
-    id: "valid-from",
-    label: "Valid From",
-    kind: "text",
-    text: "VALID FROM: 13-08-2026",
-    side: "front",
-    x: 300,
-    y: 415,
-    width: 250,
-    height: 35,
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#075c2b",
-    background: "#ffffff",
-  },
-
-  {
-    id: "valid-till",
-    label: "Valid Till",
-    kind: "text",
-    text: "VALID TILL: 12-08-2027",
-    side: "front",
-    x: 560,
-    y: 415,
-    width: 250,
-    height: 35,
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#075c2b",
-    background: "#ffffff",
   },
 
   {
