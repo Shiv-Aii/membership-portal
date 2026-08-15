@@ -106,6 +106,70 @@ function dateValue(
   return `${day}-${month}-${year}`;
 }
 
+function formatDynamicFieldLabel(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDynamicFieldValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  return String(value);
+}
+
+/*
+ * Fields that are technical/database-only values and should not be printed
+ * as member registration information. Any NEW registration column that is
+ * added later will automatically be included unless it is in this list.
+ */
+const DYNAMIC_FIELD_EXCLUDED_KEYS = new Set([
+  "id",
+  "uuid",
+  "user_id",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+  "photo",
+  "photo_url",
+  "profile_photo",
+  "profile_photo_url",
+  "member_photo",
+  "image",
+  "image_url",
+  "photo_path",
+  "profile_image",
+  "profile_image_url",
+]);
+
+const DYNAMIC_MEMBER_PREFIX = "dynamic-member-field-";
+
+function getDynamicMemberFields(member: MemberRecord) {
+  return Object.entries(member)
+    .filter(([key, value]) => {
+      if (DYNAMIC_FIELD_EXCLUDED_KEYS.has(key)) return false;
+      if (value === null || value === undefined) return false;
+      if (typeof value === "string" && value.trim() === "") return false;
+      return true;
+    })
+    .map(([key, value]) => ({
+      key,
+      label: formatDynamicFieldLabel(key),
+      value: formatDynamicFieldValue(value),
+    }));
+}
+
 function applyMemberDataToElements(
   current: CardElement[],
   member: MemberRecord
@@ -220,7 +284,102 @@ function applyMemberDataToElements(
     "12-08-2027"
   );
 
-  return current.map((element) => {
+  const fixedMemberKeys = new Set([
+    "full_name",
+    "member_name",
+    "applicant_name",
+    "name",
+    "kannada_name",
+    "fullName",
+    "membership_number",
+    "membership_no",
+    "member_number",
+    "member_no",
+    "membership_id",
+    "card_number",
+    "designation",
+    "post",
+    "role",
+    "member_designation",
+    "designation_name",
+    "village",
+    "village_name",
+    "gram",
+    "gram_name",
+    "taluk",
+    "taluk_name",
+    "talukName",
+    "district",
+    "district_name",
+    "districtName",
+    "mobile",
+    "mobile_number",
+    "phone",
+    "phone_number",
+    "contact_number",
+    "aadhaar_number",
+    "aadhar_number",
+    "aadhaar",
+    "aadhar",
+    "aadhaar_no",
+    "aadhar_no",
+    "aadhaarNumber",
+    "aadharNumber",
+    "valid_from",
+    "valid_from_date",
+    "membership_from",
+    "start_date",
+    "approved_date",
+    "approval_date",
+    "valid_till",
+    "valid_till_date",
+    "valid_until",
+    "expiry_date",
+    "membership_expiry",
+    "expires_at",
+    "end_date",
+  ]);
+
+  const dynamicFields = getDynamicMemberFields(member).filter(
+    ({ key }) => !fixedMemberKeys.has(key)
+  );
+
+  const dynamicCount = dynamicFields.length;
+  const columns = 2;
+  const rows = Math.max(1, Math.ceil(dynamicCount / columns));
+  const availableHeight = 205;
+  const rowHeight = Math.max(12, Math.min(24, Math.floor(availableHeight / rows)));
+  const dynamicFontSize = dynamicCount > 24 ? 10 : dynamicCount > 16 ? 11 : 12;
+  const columnWidth = 390;
+
+  const dynamicElements: CardElement[] = dynamicFields.map(
+    ({ key, label, value }, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+
+      return {
+        id: `${DYNAMIC_MEMBER_PREFIX}${key}`,
+        label: `Auto: ${label}`,
+        kind: "text",
+        text: `${label}: ${value}`,
+        side: "back",
+        x: 45 + column * 395,
+        y: 185 + row * rowHeight,
+        width: columnWidth,
+        height: rowHeight,
+        fontSize: dynamicFontSize,
+        fontWeight: "600",
+        color: "#111111",
+        background: "transparent",
+      };
+    }
+  );
+
+  const cleanedCurrent = current.filter(
+    (element) => !element.id.startsWith(DYNAMIC_MEMBER_PREFIX)
+  );
+
+  return cleanedCurrent.map((element) => {
     switch (element.id) {
       case "name":
         return { ...element, text: `ಹೆಸರು : ${name}` };
@@ -247,8 +406,9 @@ function applyMemberDataToElements(
       default:
         return element;
     }
-  });
+  }).concat(dynamicElements);
 }
+
 
 const initialElements: CardElement[] = [
   {
@@ -645,10 +805,15 @@ function getMasterTemplateElements(
     initialElements.map((element) => [element.id, element])
   );
 
-  return current.map((element) => {
-    if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
-      return { ...element };
-    }
+  return current
+    .filter(
+      (element) =>
+        !element.id.startsWith(DYNAMIC_MEMBER_PREFIX)
+    )
+    .map((element) => {
+      if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
+        return { ...element };
+      }
 
     const original = initialById.get(element.id);
 
