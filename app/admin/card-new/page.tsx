@@ -223,21 +223,21 @@ function applyMemberDataToElements(
   return current.map((element) => {
     switch (element.id) {
       case "name":
-        return { ...element, text: `ಹೆಸರು / Name: ${name}` };
+        return { ...element, text: `ಹೆಸರು : ${name}` };
       case "membership":
         return { ...element, text: `Membership No: ${membership}` };
       case "designation":
-        return { ...element, text: `ಹುದ್ದೆ / Designation: ${designation}` };
+        return { ...element, text: `ಹುದ್ದೆ  : ${designation}` };
       case "village":
-        return { ...element, text: `ಗ್ರಾಮ / Village: ${village}` };
+        return { ...element, text: `ಗ್ರಾಮ  : ${village}` };
       case "taluk":
-        return { ...element, text: `ತಾಲ್ಲೂಕು / Taluk: ${taluk}` };
+        return { ...element, text: `ತಾಲ್ಲೂಕು : ${taluk}` };
       case "district":
-        return { ...element, text: `ಜಿಲ್ಲೆ / District: ${district}` };
+        return { ...element, text: `ಜಿಲ್ಲೆ : ${district}` };
       case "mobile":
-        return { ...element, text: `ಮೊಬೈಲ್ / Mobile: ${mobile}` };
+        return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
       case "aadhaar":
-        return { ...element, text: `ಆಧಾರ್ / Aadhaar: ${aadhaar}` };
+        return { ...element, text: `ಆಧಾರ : ${aadhaar}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -802,11 +802,44 @@ function NewCardDesignerPageContent() {
             ) &&
             design.elements.length > 0
           ) {
-            const masterElements = cloneElements(
+            const savedElements = cloneElements(
               design.elements
             );
 
-            setElements(masterElements);
+            // Keep the saved template design/positions, but add any
+            // required member-detail fields that older templates do
+            // not have yet.
+            const savedIds = new Set(
+              savedElements.map((element) => element.id)
+            );
+
+            const missingRequiredElements =
+              initialElements
+                .filter((element) => !savedIds.has(element.id))
+                .map((element) => ({ ...element }));
+
+            const masterElements = [
+              ...savedElements,
+              ...missingRequiredElements,
+            ];
+
+            setElements(
+              memberData
+                ? applyMemberDataToElements(
+                    masterElements,
+                    memberData
+                  )
+                : masterElements
+            );
+          } else {
+            setElements(
+              memberData
+                ? applyMemberDataToElements(
+                    cloneElements(initialElements),
+                    memberData
+                  )
+                : cloneElements(initialElements)
+            );
           }
         }
       } catch (error) {
@@ -821,6 +854,23 @@ function NewCardDesignerPageContent() {
 
     loadTemplate();
   }, []);
+
+  /*
+  =========================================
+  APPLY MEMBER DATA TO CURRENT CARD
+  =========================================
+  */
+
+  useEffect(() => {
+    if (!memberData) return;
+
+    setElements((current) =>
+      applyMemberDataToElements(
+        current,
+        memberData
+      )
+    );
+  }, [memberData]);
 
   /*
   =========================================
