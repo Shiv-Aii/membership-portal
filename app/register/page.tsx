@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Cropper from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
+
+type Area = {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+};
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -11,19 +19,28 @@ export default function RegisterPage() {
   const [district, setDistrict] = useState("");
   const [mobile, setMobile] = useState("");
   const [aadhaar, setAadhaar] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
 
+  const [cropImage, setCropImage] = useState("");
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] =
+    useState<Area | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error" | "">("");
+  const [messageType, setMessageType] = useState<"success" | "error" | "">(
+    ""
+  );
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
 
     if (!file) {
-      setPhoto(null);
-      setPhotoPreview("");
       return;
     }
 
@@ -39,10 +56,104 @@ export default function RegisterPage() {
       return;
     }
 
-    setPhoto(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    const imageUrl = URL.createObjectURL(file);
+
+    setCropImage(imageUrl);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setShowCropper(true);
+
     setMessage("");
     setMessageType("");
+  }
+
+  function onCropComplete(_: Area, croppedPixels: Area) {
+    setCroppedAreaPixels(croppedPixels);
+  }
+
+  async function createCroppedImage(): Promise<File | null> {
+    if (!cropImage || !croppedAreaPixels) {
+      return null;
+    }
+
+    const image = new Image();
+    image.src = cropImage;
+
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      return null;
+    }
+
+    canvas.width = croppedAreaPixels.width;
+    canvas.height = croppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+
+          const file = new File([blob], "member-photo.jpg", {
+            type: "image/jpeg",
+          });
+
+          resolve(file);
+        },
+        "image/jpeg",
+        0.9
+      );
+    });
+  }
+
+  async function handleCropDone() {
+    try {
+      const croppedFile = await createCroppedImage();
+
+      if (!croppedFile) {
+        setMessage("ಫೋಟೋ crop ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.");
+        setMessageType("error");
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(croppedFile);
+
+      setPhoto(croppedFile);
+      setPhotoPreview(previewUrl);
+
+      setShowCropper(false);
+    } catch (error) {
+      console.error(error);
+      setMessage("ಫೋಟೋ crop ಮಾಡುವಾಗ ಸಮಸ್ಯೆ ಉಂಟಾಗಿದೆ.");
+      setMessageType("error");
+    }
+  }
+
+  function handleCropCancel() {
+    setShowCropper(false);
+    setCropImage("");
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -62,7 +173,7 @@ export default function RegisterPage() {
       !aadhaar.trim() ||
       !photo
     ) {
-      setMessage("ದಯವಿಟ್ಟು ಎಲ್ಲಾ ಮಾಹಿತಿಯನ್ನು ತುಂಬಿ.");
+      setMessage("ದಯವಿಟ್ಟು ಎಲ್ಲಾ ಕಡ್ಡಾಯ ಮಾಹಿತಿಯನ್ನು ತುಂಬಿ.");
       setMessageType("error");
       return;
     }
@@ -88,19 +199,20 @@ export default function RegisterPage() {
     try {
       setBusy(true);
 
-      // 1. Upload photo
-      const fileExt = photo.name.split(".").pop()?.toLowerCase() || "jpg";
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      // 1. Upload cropped photo
+      const fileName = `${crypto.randomUUID()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("member-photos")
-        .upload(fileName, photo);
+        .upload(fileName, photo, {
+          contentType: "image/jpeg",
+        });
 
       if (uploadError) {
         throw uploadError;
       }
 
-      // 2. Get photo URL
+      // 2. Get public photo URL
       const { data: publicUrlData } = supabase.storage
         .from("member-photos")
         .getPublicUrl(fileName);
@@ -118,6 +230,7 @@ export default function RegisterPage() {
           district: district.trim(),
           mobile: cleanMobile,
           aadhaar: cleanAadhaar,
+          vehicle_number: vehicleNumber.trim() || null,
           photo_url: photoUrl,
           status: "pending",
         });
@@ -140,6 +253,7 @@ export default function RegisterPage() {
       setDistrict("");
       setMobile("");
       setAadhaar("");
+      setVehicleNumber("");
       setPhoto(null);
       setPhotoPreview("");
 
@@ -172,7 +286,7 @@ export default function RegisterPage() {
 
         {/* Header */}
         <div className="mb-5 overflow-hidden rounded-3xl bg-gradient-to-r from-green-700 to-emerald-600 p-6 text-center text-white shadow-lg">
-          <div className="text-5xl mb-3">🌾</div>
+          <div className="mb-3 text-5xl">🌾</div>
 
           <h1 className="text-2xl font-extrabold md:text-3xl">
             ರೈತ ಸದಸ್ಯತ್ವ ನೋಂದಣಿ
@@ -361,6 +475,26 @@ export default function RegisterPage() {
                     🔒 ನಿಮ್ಮ ಮಾಹಿತಿಯನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.
                   </p>
                 </div>
+
+                {/* Vehicle Number - OPTIONAL */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                    🚜 ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number
+                    <span className="ml-2 text-xs font-normal text-slate-400">
+                      (ಐಚ್ಛಿಕ / Optional)
+                    </span>
+                  </label>
+
+                  <input
+                    type="text"
+                    placeholder="ಉದಾ: KA01AB1234"
+                    value={vehicleNumber}
+                    onChange={(e) =>
+                      setVehicleNumber(e.target.value.toUpperCase())
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-base uppercase outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
+                  />
+                </div>
               </div>
             </div>
 
@@ -381,7 +515,7 @@ export default function RegisterPage() {
                     />
 
                     <p className="mt-3 text-sm font-semibold text-green-700">
-                      ✅ ಫೋಟೋ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ
+                      ✅ ಫೋಟೋ crop ಮಾಡಲಾಗಿದೆ
                     </p>
                   </div>
                 ) : (
@@ -468,6 +602,80 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* PHOTO CROPPER */}
+      {showCropper && cropImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+
+            <div className="p-4 text-center">
+              <h2 className="text-xl font-extrabold text-slate-800">
+                📸 ಫೋಟೋ Crop ಮಾಡಿ
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                ಫೋಟೋವನ್ನು drag ಮಾಡಿ ಮತ್ತು zoom ಮಾಡಿ
+              </p>
+            </div>
+
+            <div className="relative h-[350px] w-full bg-black">
+              <Cropper
+                image={cropImage}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+                cropShape="rect"
+                showGrid={true}
+              />
+            </div>
+
+            {/* Zoom */}
+            <div className="px-5 pt-5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-bold text-slate-700">
+                  🔍 Zoom
+                </span>
+
+                <span className="text-sm text-slate-500">
+                  {zoom.toFixed(1)}x
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-full accent-green-700"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="grid grid-cols-2 gap-3 p-5">
+              <button
+                type="button"
+                onClick={handleCropCancel}
+                className="rounded-xl border border-slate-300 py-3 font-bold text-slate-700 hover:bg-slate-50"
+              >
+                ❌ Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCropDone}
+                className="rounded-xl bg-green-700 py-3 font-bold text-white hover:bg-green-800"
+              >
+                ✅ Crop Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
