@@ -106,103 +106,10 @@ function dateValue(
   return `${day}-${month}-${year}`;
 }
 
-function formatDynamicLabel(key: string): string {
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatDynamicValue(value: any): string {
-  if (value === null || value === undefined) return "";
-
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value)
-        .replace(/[{}[\]"]/g, "")
-        .replace(/,/g, ", ");
-    } catch {
-      return String(value);
-    }
-  }
-
-  const stringValue = String(value);
-
-  // Keep date-only values readable.
-  if (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(stringValue)) {
-    const date = new Date(stringValue);
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, "0");
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const year = date.getFullYear();
-      return `${day}-${month}-${year}`;
-    }
-  }
-
-  return stringValue;
-}
-
-function isTechnicalMemberField(key: string): boolean {
-  const technical = new Set([
-    "id",
-    "created_at",
-    "updated_at",
-    "deleted_at",
-    "password",
-    "password_hash",
-    "token",
-    "access_token",
-    "refresh_token",
-    "photo_url",
-    "photo",
-    "profile_photo",
-    "profile_photo_url",
-    "member_photo",
-    "image_url",
-    "image",
-    "photo_path",
-    "profile_image",
-    "profile_image_url",
-  ]);
-
-  return technical.has(key.toLowerCase());
-}
-
-function getDynamicMemberFields(member: MemberRecord): Array<{
-  key: string;
-  label: string;
-  value: string;
-}> {
-  return Object.entries(member)
-    .filter(([key, value]) => {
-      if (isTechnicalMemberField(key)) return false;
-      if (value === null || value === undefined) return false;
-      if (typeof value === "string" && value.trim() === "") return false;
-      return true;
-    })
-    .map(([key, value]) => ({
-      key,
-      label: formatDynamicLabel(key),
-      value: formatDynamicValue(value),
-    }));
-}
-
 function applyMemberDataToElements(
   current: CardElement[],
   member: MemberRecord
 ): CardElement[] {
-  /*
-   * IMPORTANT:
-   * The database is read with select("*"), so this function does not
-   * depend on a fixed list of registration fields.
-   *
-   * Every non-technical member column is automatically converted into
-   * a FRONT card field. If a new registration column is added later,
-   * it will appear automatically without changing this page again.
-   */
-
   const name = textValue(
     member,
     [
@@ -286,6 +193,17 @@ function applyMemberDataToElements(
     "ಆಧಾರ್ / Aadhaar Number"
   );
 
+  const vehicleNumber = textValue(
+    member,
+    [
+      "vehicle_number",
+      "vehicle_no",
+      "vehicleNumber",
+      "vehicle",
+    ],
+    "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number"
+  );
+
   const validFrom = dateValue(
     member,
     [
@@ -313,7 +231,7 @@ function applyMemberDataToElements(
     "12-08-2027"
   );
 
-  const mappedElements = current.map((element) => {
+  return current.map((element) => {
     switch (element.id) {
       case "name":
         return { ...element, text: `ಹೆಸರು : ${name}` };
@@ -331,6 +249,8 @@ function applyMemberDataToElements(
         return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
       case "aadhaar":
         return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
+      case "vehicle-number":
+        return { ...element, text: `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -341,57 +261,6 @@ function applyMemberDataToElements(
         return element;
     }
   });
-
-  // Remove previously generated automatic fields before generating them
-  // again. This prevents duplicates when memberData/template changes.
-  const withoutOldDynamicFields = mappedElements.filter(
-    (element) => !element.id.startsWith("auto-member-")
-  );
-
-  const dynamicFields = getDynamicMemberFields(member);
-
-  /*
-   * FRONT ONLY:
-   * Existing photo is kept on the left and QR is kept on the right.
-   * Automatic registration details are placed in the center and,
-   * when there are many fields, continue in compact rows.
-   *
-   * These elements are runtime-only and are NOT saved into the master
-   * template.
-   */
-  const startX = 245;
-  const startY = 125;
-  const columnWidth = 195;
-  const rowHeight = 27;
-  const columns = 2;
-  const maxRows = 12;
-
-  const autoElements: CardElement[] = dynamicFields
-    .map((field, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-
-      if (row >= maxRows) return null;
-
-      return {
-        id: `auto-member-${field.key}`,
-        label: field.label,
-        kind: "text" as const,
-        text: `${field.label}: ${field.value}`,
-        side: "front" as const,
-        x: startX + column * columnWidth,
-        y: startY + row * rowHeight,
-        width: columnWidth - 8,
-        height: rowHeight - 2,
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#111111",
-        background: "transparent",
-      };
-    })
-    .filter(Boolean) as CardElement[];
-
-  return [...withoutOldDynamicFields, ...autoElements];
 }
 
 const initialElements: CardElement[] = [
@@ -568,6 +437,22 @@ const initialElements: CardElement[] = [
     fontSize: 16,
     fontWeight: "600",
     color: "#075c2b",
+    background: "transparent",
+  },
+
+  {
+    id: "vehicle-number",
+    label: "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number",
+    kind: "text",
+    text: "ವಾಹನ ಸಂಖ್ಯೆ : Vehicle Number",
+    side: "front",
+    x: 255,
+    y: 431,
+    width: 365,
+    height: 30,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111111",
     background: "transparent",
   },
 
@@ -776,6 +661,7 @@ const MEMBER_DATA_ELEMENT_IDS = new Set([
   "district",
   "mobile",
   "aadhaar",
+  "vehicle-number",
   "valid-from",
   "valid-till",
   "back-valid-from",
@@ -789,9 +675,7 @@ function getMasterTemplateElements(
     initialElements.map((element) => [element.id, element])
   );
 
-  return current
-    .filter((element) => !element.id.startsWith("auto-member-"))
-    .map((element) => {
+  return current.map((element) => {
     if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
       return { ...element };
     }
