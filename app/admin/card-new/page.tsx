@@ -106,9 +106,8 @@ function dateValue(
   return `${day}-${month}-${year}`;
 }
 
-function formatDynamicFieldLabel(key: string): string {
+function formatDynamicLabel(key: string): string {
   return key
-    .replace(/\./g, " / ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -116,107 +115,94 @@ function formatDynamicFieldLabel(key: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatDynamicFieldValue(value: unknown): string {
+function formatDynamicValue(value: any): string {
   if (value === null || value === undefined) return "";
 
   if (typeof value === "object") {
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(value)
+        .replace(/[{}[\]"]/g, "")
+        .replace(/,/g, ", ");
     } catch {
       return String(value);
     }
   }
 
-  return String(value);
-}
+  const stringValue = String(value);
 
-/*
- * Database-only fields are not useful on the PVC card.
- * Every other scalar field is automatically included, including
- * fields added later to the registration form/database.
- */
-const DYNAMIC_FIELD_EXCLUDED_KEYS = new Set([
-  "id",
-  "uuid",
-  "user_id",
-  "created_at",
-  "updated_at",
-  "deleted_at",
-  "password",
-  "password_hash",
-  "photo",
-  "photo_url",
-  "profile_photo",
-  "profile_photo_url",
-  "member_photo",
-  "image",
-  "image_url",
-  "photo_path",
-  "profile_image",
-  "profile_image_url",
-]);
-
-const DYNAMIC_MEMBER_PREFIX = "dynamic-member-field-";
-
-function collectDynamicFields(
-  value: unknown,
-  parentKey = "",
-  output: Array<{ key: string; label: string; value: string }> = []
-) {
-  if (value === null || value === undefined) return output;
-
-  if (typeof value === "object" && !Array.isArray(value)) {
-    Object.entries(value as Record<string, unknown>).forEach(([key, child]) => {
-      const fullKey = parentKey ? `${parentKey}.${key}` : key;
-      collectDynamicFields(child, fullKey, output);
-    });
-    return output;
-  }
-
-  if (Array.isArray(value)) {
-    const text = value.map((item) => formatDynamicFieldValue(item)).join(", ");
-    if (text.trim()) {
-      output.push({
-        key: parentKey,
-        label: formatDynamicFieldLabel(parentKey),
-        value: text,
-      });
+  // Keep date-only values readable.
+  if (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(stringValue)) {
+    const date = new Date(stringValue);
+    if (!Number.isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
     }
-    return output;
   }
 
-  const text = formatDynamicFieldValue(value);
-  if (parentKey && text.trim()) {
-    output.push({
-      key: parentKey,
-      label: formatDynamicFieldLabel(parentKey),
-      value: text,
-    });
-  }
-
-  return output;
+  return stringValue;
 }
 
-function getDynamicMemberFields(member: MemberRecord) {
-  const output: Array<{ key: string; label: string; value: string }> = [];
+function isTechnicalMemberField(key: string): boolean {
+  const technical = new Set([
+    "id",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+    "password",
+    "password_hash",
+    "token",
+    "access_token",
+    "refresh_token",
+    "photo_url",
+    "photo",
+    "profile_photo",
+    "profile_photo_url",
+    "member_photo",
+    "image_url",
+    "image",
+    "photo_path",
+    "profile_image",
+    "profile_image_url",
+  ]);
 
-  Object.entries(member).forEach(([key, value]) => {
-    if (DYNAMIC_FIELD_EXCLUDED_KEYS.has(key)) return;
-    collectDynamicFields(value, key, output);
-  });
+  return technical.has(key.toLowerCase());
+}
 
-  const seen = new Set<string>();
-  return output.filter((field) => {
-    if (seen.has(field.key)) return false;
-    seen.add(field.key);
-    return true;
-  });
+function getDynamicMemberFields(member: MemberRecord): Array<{
+  key: string;
+  label: string;
+  value: string;
+}> {
+  return Object.entries(member)
+    .filter(([key, value]) => {
+      if (isTechnicalMemberField(key)) return false;
+      if (value === null || value === undefined) return false;
+      if (typeof value === "string" && value.trim() === "") return false;
+      return true;
+    })
+    .map(([key, value]) => ({
+      key,
+      label: formatDynamicLabel(key),
+      value: formatDynamicValue(value),
+    }));
 }
 
 function applyMemberDataToElements(
   current: CardElement[],
   member: MemberRecord
 ): CardElement[] {
+  /*
+   * IMPORTANT:
+   * The database is read with select("*"), so this function does not
+   * depend on a fixed list of registration fields.
+   *
+   * Every non-technical member column is automatically converted into
+   * a FRONT card field. If a new registration column is added later,
+   * it will appear automatically without changing this page again.
+   */
+
   const name = textValue(
     member,
     [
@@ -327,102 +313,7 @@ function applyMemberDataToElements(
     "12-08-2027"
   );
 
-  const fixedMemberKeys = new Set([
-    "full_name",
-    "member_name",
-    "applicant_name",
-    "name",
-    "kannada_name",
-    "fullName",
-    "membership_number",
-    "membership_no",
-    "member_number",
-    "member_no",
-    "membership_id",
-    "card_number",
-    "designation",
-    "post",
-    "role",
-    "member_designation",
-    "designation_name",
-    "village",
-    "village_name",
-    "gram",
-    "gram_name",
-    "taluk",
-    "taluk_name",
-    "talukName",
-    "district",
-    "district_name",
-    "districtName",
-    "mobile",
-    "mobile_number",
-    "phone",
-    "phone_number",
-    "contact_number",
-    "aadhaar_number",
-    "aadhar_number",
-    "aadhaar",
-    "aadhar",
-    "aadhaar_no",
-    "aadhar_no",
-    "aadhaarNumber",
-    "aadharNumber",
-    "valid_from",
-    "valid_from_date",
-    "membership_from",
-    "start_date",
-    "approved_date",
-    "approval_date",
-    "valid_till",
-    "valid_till_date",
-    "valid_until",
-    "expiry_date",
-    "membership_expiry",
-    "expires_at",
-    "end_date",
-  ]);
-
-  const dynamicFields = getDynamicMemberFields(member).filter(
-    ({ key }) => !fixedMemberKeys.has(key)
-  );
-
-  const dynamicCount = dynamicFields.length;
-  const columns = 2;
-  const rows = Math.max(1, Math.ceil(dynamicCount / columns));
-  const availableHeight = 205;
-  const rowHeight = Math.max(12, Math.min(22, Math.floor(availableHeight / rows)));
-  const dynamicFontSize = dynamicCount > 24 ? 9 : dynamicCount > 16 ? 10 : 12;
-  const columnWidth = 385;
-
-  const dynamicElements: CardElement[] = dynamicFields.map(
-    ({ key, label, value }, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-
-      return {
-        id: `${DYNAMIC_MEMBER_PREFIX}${key}`,
-        label: `Auto: ${label}`,
-        kind: "text",
-        text: `${label}: ${value}`,
-        side: "back",
-        x: 45 + column * 390,
-        y: 185 + row * rowHeight,
-        width: columnWidth,
-        height: rowHeight,
-        fontSize: dynamicFontSize,
-        fontWeight: "600",
-        color: "#111111",
-        background: "transparent",
-      };
-    }
-  );
-
-  const cleanedCurrent = current.filter(
-    (element) => !element.id.startsWith(DYNAMIC_MEMBER_PREFIX)
-  );
-
-  return cleanedCurrent.map((element) => {
+  const mappedElements = current.map((element) => {
     switch (element.id) {
       case "name":
         return { ...element, text: `ಹೆಸರು : ${name}` };
@@ -449,9 +340,59 @@ function applyMemberDataToElements(
       default:
         return element;
     }
-  }).concat(dynamicElements);
-}
+  });
 
+  // Remove previously generated automatic fields before generating them
+  // again. This prevents duplicates when memberData/template changes.
+  const withoutOldDynamicFields = mappedElements.filter(
+    (element) => !element.id.startsWith("auto-member-")
+  );
+
+  const dynamicFields = getDynamicMemberFields(member);
+
+  /*
+   * FRONT ONLY:
+   * Existing photo is kept on the left and QR is kept on the right.
+   * Automatic registration details are placed in the center and,
+   * when there are many fields, continue in compact rows.
+   *
+   * These elements are runtime-only and are NOT saved into the master
+   * template.
+   */
+  const startX = 245;
+  const startY = 125;
+  const columnWidth = 195;
+  const rowHeight = 27;
+  const columns = 2;
+  const maxRows = 12;
+
+  const autoElements: CardElement[] = dynamicFields
+    .map((field, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+
+      if (row >= maxRows) return null;
+
+      return {
+        id: `auto-member-${field.key}`,
+        label: field.label,
+        kind: "text" as const,
+        text: `${field.label}: ${field.value}`,
+        side: "front" as const,
+        x: startX + column * columnWidth,
+        y: startY + row * rowHeight,
+        width: columnWidth - 8,
+        height: rowHeight - 2,
+        fontSize: 12,
+        fontWeight: "600",
+        color: "#111111",
+        background: "transparent",
+      };
+    })
+    .filter(Boolean) as CardElement[];
+
+  return [...withoutOldDynamicFields, ...autoElements];
+}
 
 const initialElements: CardElement[] = [
   {
@@ -849,14 +790,11 @@ function getMasterTemplateElements(
   );
 
   return current
-    .filter(
-      (element) =>
-        !element.id.startsWith(DYNAMIC_MEMBER_PREFIX)
-    )
+    .filter((element) => !element.id.startsWith("auto-member-"))
     .map((element) => {
-      if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
-        return { ...element };
-      }
+    if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
+      return { ...element };
+    }
 
     const original = initialById.get(element.id);
 
@@ -1070,8 +1008,6 @@ function NewCardDesignerPageContent() {
       try {
         let found: MemberRecord | null = null;
 
-        // Read every possible member table instead of stopping at the first
-        // match. Registration/member data may be split across tables.
         for (const table of MEMBER_TABLES) {
           try {
             const { data, error } = await supabase
@@ -1081,23 +1017,8 @@ function NewCardDesignerPageContent() {
               .maybeSingle();
 
             if (!error && data) {
-              const row = data as MemberRecord;
-
-              if (!found) {
-                found = { ...row };
-              } else {
-                Object.entries(row).forEach(([key, value]) => {
-                  const current = found?.[key];
-                  const currentEmpty =
-                    current === null ||
-                    current === undefined ||
-                    (typeof current === "string" && current.trim() === "");
-
-                  if (currentEmpty && value !== null && value !== undefined) {
-                    found![key] = value;
-                  }
-                });
-              }
+              found = data as MemberRecord;
+              break;
             }
           } catch (tableError) {
             console.warn(`Member table ${table} could not be read`, tableError);
@@ -1773,7 +1694,6 @@ function NewCardDesignerPageContent() {
             : "padding:0",
           "font-family:Arial,'Noto Sans Kannada','Noto Sans',sans-serif",
           "line-height:1.2",
-          "white-space:pre-wrap",
         ].join(";");
 
         if (element.kind === "photo") {
@@ -2599,7 +2519,6 @@ function NewCardDesignerPageContent() {
 
                             touchAction:
                               "none",
-                            whiteSpace: "pre-wrap",
                           }}
                         >
                           {element.text}
