@@ -136,22 +136,34 @@ function applyMemberDataToElements(
     "Membership Number"
   );
 
+  const designation = textValue(
+    member,
+    [
+      "designation",
+      "post",
+      "role",
+      "member_designation",
+      "designation_name",
+    ],
+    "ಹುದ್ದೆ / Designation"
+  );
+
   const village = textValue(
     member,
     ["village", "village_name", "gram", "gram_name"],
-    "ಗ್ರಾಮದ ಹೆಸರು"
+    "ಗ್ರಾಮ / Village"
   );
 
   const taluk = textValue(
     member,
     ["taluk", "taluk_name", "talukName"],
-    "ತಾಲ್ಲೂಕಿನ ಹೆಸರು"
+    "ತಾಲ್ಲೂಕು / Taluk"
   );
 
   const district = textValue(
     member,
     ["district", "district_name", "districtName"],
-    "ಜಿಲ್ಲೆಯ ಹೆಸರು"
+    "ಜಿಲ್ಲೆ / District"
   );
 
   const mobile = textValue(
@@ -163,7 +175,22 @@ function applyMemberDataToElements(
       "phone_number",
       "contact_number",
     ],
-    "9980XXXXXX"
+    "ಮೊಬೈಲ್ / Mobile Number"
+  );
+
+  const aadhaar = textValue(
+    member,
+    [
+      "aadhaar_number",
+      "aadhar_number",
+      "aadhaar",
+      "aadhar",
+      "aadhaar_no",
+      "aadhar_no",
+      "aadhaarNumber",
+      "aadharNumber",
+    ],
+    "ಆಧಾರ್ / Aadhaar Number"
   );
 
   const validFrom = dateValue(
@@ -196,17 +223,21 @@ function applyMemberDataToElements(
   return current.map((element) => {
     switch (element.id) {
       case "name":
-        return { ...element, text: name };
+        return { ...element, text: `ಹೆಸರು / Name: ${name}` };
       case "membership":
-        return { ...element, text: membership };
+        return { ...element, text: `Membership No: ${membership}` };
+      case "designation":
+        return { ...element, text: `ಹುದ್ದೆ / Designation: ${designation}` };
       case "village":
-        return { ...element, text: village };
+        return { ...element, text: `ಗ್ರಾಮ / Village: ${village}` };
       case "taluk":
-        return { ...element, text: taluk };
+        return { ...element, text: `ತಾಲ್ಲೂಕು / Taluk: ${taluk}` };
       case "district":
-        return { ...element, text: district };
+        return { ...element, text: `ಜಿಲ್ಲೆ / District: ${district}` };
       case "mobile":
-        return { ...element, text: mobile };
+        return { ...element, text: `ಮೊಬೈಲ್ / Mobile: ${mobile}` };
+      case "aadhaar":
+        return { ...element, text: `ಆಧಾರ್ / Aadhaar: ${aadhaar}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -270,16 +301,112 @@ const initialElements: CardElement[] = [
 
   {
     id: "name",
-    label: "ಹೆಸರು",
+    label: "ಹೆಸರು / Name",
     kind: "text",
-    text: "ಸದಸ್ಯರ ಹೆಸರು",
+    text: "ಹೆಸರು / Name: ಸದಸ್ಯರ ಹೆಸರು",
     side: "front",
-    x: 300,
-    y: 155,
-    width: 400,
-    height: 35,
-    fontSize: 22,
+    x: 255,
+    y: 135,
+    width: 365,
+    height: 34,
+    fontSize: 19,
     fontWeight: "700",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "designation",
+    label: "ಹುದ್ದೆ / Designation",
+    kind: "text",
+    text: "ಹುದ್ದೆ / Designation: ಹುದ್ದೆ",
+    side: "front",
+    x: 255,
+    y: 172,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "village",
+    label: "ಗ್ರಾಮ / Village",
+    kind: "text",
+    text: "ಗ್ರಾಮ / Village: ಗ್ರಾಮದ ಹೆಸರು",
+    side: "front",
+    x: 255,
+    y: 209,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "taluk",
+    label: "ತಾಲ್ಲೂಕು / Taluk",
+    kind: "text",
+    text: "ತಾಲ್ಲೂಕು / Taluk: ತಾಲ್ಲೂಕಿನ ಹೆಸರು",
+    side: "front",
+    x: 255,
+    y: 246,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "district",
+    label: "ಜಿಲ್ಲೆ / District",
+    kind: "text",
+    text: "ಜಿಲ್ಲೆ / District: ಜಿಲ್ಲೆಯ ಹೆಸರು",
+    side: "front",
+    x: 255,
+    y: 283,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "mobile",
+    label: "ಮೊಬೈಲ್ / Mobile Number",
+    kind: "text",
+    text: "ಮೊಬೈಲ್ / Mobile: 9980XXXXXX",
+    side: "front",
+    x: 255,
+    y: 320,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
+    id: "aadhaar",
+    label: "ಆಧಾರ್ / Aadhaar Number",
+    kind: "text",
+    text: "ಆಧಾರ್ / Aadhaar: XXXXXXXX",
+    side: "front",
+    x: 255,
+    y: 357,
+    width: 365,
+    height: 34,
+    fontSize: 18,
+    fontWeight: "600",
     color: "#111111",
     background: "transparent",
   },
@@ -288,80 +415,66 @@ const initialElements: CardElement[] = [
     id: "membership",
     label: "Membership Number",
     kind: "text",
-    text: "Membership Number",
+    text: "Membership No: Membership Number",
     side: "front",
-    x: 300,
-    y: 200,
-    width: 400,
-    height: 32,
-    fontSize: 20,
+    x: 255,
+    y: 394,
+    width: 365,
+    height: 30,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#111111",
+    color: "#075c2b",
     background: "transparent",
   },
 
   {
-    id: "village",
-    label: "ಗ್ರಾಮ",
+    id: "front-photo-label",
+    label: "ಫೋಟೋ / Photo",
     kind: "text",
-    text: "ಗ್ರಾಮದ ಹೆಸರು",
+    text: "ಫೋಟೋ / Photo",
     side: "front",
-    x: 300,
-    y: 245,
-    width: 350,
-    height: 32,
-    fontSize: 19,
-    fontWeight: "500",
-    color: "#111111",
+    x: 45,
+    y: 112,
+    width: 190,
+    height: 28,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#075c2b",
     background: "transparent",
   },
 
   {
-    id: "taluk",
-    label: "ತಾಲ್ಲೂಕು",
-    kind: "text",
-    text: "ತಾಲ್ಲೂಕಿನ ಹೆಸರು",
+    id: "front-photo",
+    label: "ಫೋಟೋ / Photo",
+    kind: "photo",
+    text: "",
     side: "front",
-    x: 300,
-    y: 285,
-    width: 350,
-    height: 32,
-    fontSize: 19,
-    fontWeight: "500",
-    color: "#111111",
-    background: "transparent",
+    x: 45,
+    y: 145,
+    width: 190,
+    height: 230,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#075c2b",
+    background: "#ffffff",
+    borderRadius: 12,
   },
 
   {
-    id: "district",
-    label: "ಜಿಲ್ಲೆ",
-    kind: "text",
-    text: "ಜಿಲ್ಲೆಯ ಹೆಸರು",
+    id: "front-qr",
+    label: "QR Code",
+    kind: "qr",
+    text: "",
     side: "front",
-    x: 300,
-    y: 325,
-    width: 350,
-    height: 32,
-    fontSize: 19,
-    fontWeight: "500",
-    color: "#111111",
-    background: "transparent",
-  },
-
-  {
-    id: "mobile",
-    label: "ಮೊಬೈಲ್",
-    kind: "text",
-    text: "9980XXXXXX",
-    side: "front",
-    x: 300,
-    y: 365,
-    width: 300,
-    height: 32,
-    fontSize: 19,
-    fontWeight: "500",
-    color: "#111111",
-    background: "transparent",
+    x: 650,
+    y: 145,
+    width: 170,
+    height: 170,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#075c2b",
+    background: "#ffffff",
+    borderRadius: 12,
   },
 
   {
@@ -545,10 +658,12 @@ function cloneElements(elements: CardElement[]) {
 const MEMBER_DATA_ELEMENT_IDS = new Set([
   "name",
   "membership",
+  "designation",
   "village",
   "taluk",
   "district",
   "mobile",
+  "aadhaar",
   "valid-from",
   "valid-till",
   "back-valid-from",
@@ -691,14 +806,7 @@ function NewCardDesignerPageContent() {
               design.elements
             );
 
-            setElements(
-              memberData
-                ? applyMemberDataToElements(
-                    masterElements,
-                    memberData
-                  )
-                : masterElements
-            );
+            setElements(masterElements);
           }
         }
       } catch (error) {
@@ -712,7 +820,7 @@ function NewCardDesignerPageContent() {
     }
 
     loadTemplate();
-  }, [memberData]);
+  }, []);
 
   /*
   =========================================
@@ -777,6 +885,8 @@ function NewCardDesignerPageContent() {
           "image_url",
           "image",
           "photo_path",
+          "profile_image",
+          "profile_image_url",
         ]);
 
         if (photo && typeof photo === "string") {
@@ -1478,20 +1588,26 @@ function NewCardDesignerPageContent() {
     `;
   }
 
-  async function printCard() {
-    if (typeof window === "undefined") return;
+  function printCard() {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
 
     /*
-     * PDF / Print output:
+     * PDF / Print output
+     * -----------------
      * Page 1 = FRONT
      * Page 2 = BACK
-     * Each page is exactly CR80 PVC card size: 85.6 × 53.9 mm.
-     * No popup and no A4 layout are used.
+     * Each page = 85.6mm × 53.9mm (CR80 PVC card).
+     *
+     * IMPORTANT: do not await anything before window.print().
+     * Chrome Android can lose the print invocation when it is
+     * delayed by an async image/font wait. The complete print DOM
+     * is inserted synchronously, then native print is called.
      */
     document.getElementById("print-container")?.remove();
 
     const printContainer = document.createElement("div");
     printContainer.id = "print-container";
+    printContainer.setAttribute("aria-hidden", "true");
     printContainer.innerHTML = `
       ${buildPrintCardHtml("front")}
       ${buildPrintCardHtml("back")}
@@ -1499,41 +1615,25 @@ function NewCardDesignerPageContent() {
 
     document.body.appendChild(printContainer);
 
-    const images = Array.from(
-      printContainer.querySelectorAll("img")
-    );
+    // Force a synchronous layout before invoking native print.
+    void printContainer.offsetHeight;
 
-    await Promise.all(
-      images.map(
-        (image) =>
-          image.complete
-            ? Promise.resolve()
-            : new Promise<void>((resolve) => {
-                image.onload = () => resolve();
-                image.onerror = () => resolve();
-              })
-      )
-    );
-
-    if (document.fonts?.ready) {
-      try {
-        await document.fonts.ready;
-      } catch {}
-    }
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
-
+    let cleaned = false;
     const cleanup = () => {
-      document.getElementById("print-container")?.remove();
+      if (cleaned) return;
+      cleaned = true;
+      printContainer.remove();
       window.removeEventListener("afterprint", cleanup);
     };
 
-    window.addEventListener("afterprint", cleanup);
+    window.addEventListener("afterprint", cleanup, { once: true });
+
+    // Chrome Android needs the print call to remain in the original
+    // click's synchronous execution path.
     window.print();
+
+    // Safety cleanup for browsers that do not fire afterprint.
+    window.setTimeout(cleanup, 60000);
   }
 
   function resetDesign() {
@@ -1892,11 +1992,11 @@ function NewCardDesignerPageContent() {
 
           {/* MAIN GRID */}
 
-          <div className="grid lg:grid-cols-[1fr_340px] gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-5">
 
             {/* CARD AREA */}
 
-            <section className="bg-slate-200 rounded-2xl p-4 md:p-8 overflow-auto">
+            <section className="bg-slate-200 rounded-2xl p-3 sm:p-4 md:p-8 overflow-x-auto overflow-y-visible">
 
               <div className="text-center mb-3 font-bold text-slate-600">
                 {side === "front"
@@ -2276,7 +2376,7 @@ function NewCardDesignerPageContent() {
 
             {/* EDIT PANEL */}
 
-            <aside className="bg-white rounded-2xl shadow p-5 h-fit lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <aside className="bg-white rounded-2xl shadow p-4 sm:p-5 h-fit max-h-[70vh] overflow-y-auto lg:max-h-[calc(100vh-2rem)]">
 
               <h2 className="text-xl font-extrabold mb-4">
                 ✏️ Edit Selected
