@@ -201,7 +201,7 @@ function applyMemberDataToElements(
       "vehicleNumber",
       "vehicle",
     ],
-    "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number"
+    ""
   );
 
   const validFrom = dateValue(
@@ -444,7 +444,7 @@ const initialElements: CardElement[] = [
     id: "vehicle-number",
     label: "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number",
     kind: "text",
-    text: "ವಾಹನ ಸಂಖ್ಯೆ : Vehicle Number",
+    text: "",
     side: "front",
     x: 255,
     y: 431,
