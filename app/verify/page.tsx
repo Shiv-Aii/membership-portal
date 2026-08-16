@@ -26,6 +26,8 @@ type Member = {
 
   mobile?: string;
   phone?: string;
+  aadhaar?: string | number;
+  aadhaar_number?: string | number;
 
   image_url?: string;
   photo_url?: string;
@@ -68,10 +70,7 @@ function VerifyPageContent() {
   =================================================== */
 
   useEffect(() => {
-    const qrId =
-      searchParams.get("id") ||
-      searchParams.get("member_id") ||
-      searchParams.get("application_id");
+    const qrId = searchParams.get("id");
 
     if (qrId) {
       verifyMember(qrId);
@@ -79,16 +78,22 @@ function VerifyPageContent() {
   }, [searchParams]);
 
   /* ===================================================
-     VERIFY MEMBER
-     QR verification uses the unique member/application ID only.
-     Membership Number is NOT used for QR verification.
+     VERIFY MEMBER BY QR UNIQUE ID ONLY
+
+     The Card QR contains:
+       /verify?id=<applications.id>
+
+     Therefore verification is done ONLY against:
+       applications.id
+
+     Membership Number is never used to find the member.
   =================================================== */
 
   async function verifyMember(inputId?: string | null) {
     const cleanId = (inputId ?? "").trim();
 
     if (!cleanId) {
-      alert("QR Code valid member ID ಹೊಂದಿಲ್ಲ.");
+      alert("QR Code valid unique ID ಹೊಂದಿಲ್ಲ.");
       return;
     }
 
@@ -98,110 +103,40 @@ function VerifyPageContent() {
     setVerifiedAt(null);
 
     try {
-      let found: any = null;
-      let lastError: any = null;
+      /*
+       * Your approved-member data is stored in the
+       * applications table, and the Card page uses the
+       * application's id as the unique member/card ID.
+       */
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("id", cleanId)
+        .eq("status", "approved")
+        .maybeSingle();
+
+      if (error) {
+        console.error("QR VERIFY ERROR:", error);
+        throw error;
+      }
 
       /*
-       * IMPORTANT:
-       * QR verification uses the UNIQUE ID contained in the QR.
-       * It does NOT use membership_no.
-       *
-       * The QR may contain one of these query parameters:
-       *   ?id=<unique id>
-       *   ?member_id=<unique member id>
-       *   ?application_id=<application id>
-       *
-       * Each parameter is checked against its matching column.
+       * Recycle-bin members must not verify.
+       * is_deleted can be false OR NULL for active records.
        */
-      const qrParam =
-        searchParams.get("id")
-          ? "id"
-          : searchParams.get("member_id")
-          ? "member_id"
-          : searchParams.get("application_id")
-          ? "application_id"
-          : null;
-
-      const qrColumn =
-        qrParam === "member_id"
-          ? "member_id"
-          : "id";
-
-      const tables =
-        qrParam === "application_id"
-          ? ["applications"]
-          : qrParam === "member_id"
-          ? [
-              "applications",
-              "members",
-              "membership_applications",
-              "member_applications",
-              "member_profiles",
-            ]
-          : [
-              "applications",
-              "members",
-              "membership_applications",
-              "member_applications",
-              "member_profiles",
-            ];
-
-      function isApproved(row: any): boolean {
-        if (!row) return false;
-
-        if (
-          row.status !== undefined &&
-          row.status !== null
-        ) {
-          return (
-            String(row.status).toLowerCase() ===
-            "approved"
-          );
-        }
-
-        return false;
-      }
-
-      for (const table of tables) {
-        try {
-          const { data, error } = await supabase
-            .from(table)
-            .select("*")
-            .eq(qrColumn, cleanId)
-            .maybeSingle();
-
-          if (error) {
-            lastError = error;
-            continue;
-          }
-
-          if (data && isApproved(data)) {
-            found = data;
-            break;
-          }
-        } catch (tableError) {
-          lastError = tableError;
-        }
-      }
-
-      console.log("QR VERIFY:", {
-        parameter: qrParam,
-        column: qrColumn,
-        value: cleanId,
-      });
-      console.log("VERIFY RESULT:", found);
-      console.log("VERIFY ERROR:", lastError);
-
-      if (!found) {
+      if (!data || data.is_deleted === true) {
         setMember(null);
         setVerifiedAt(null);
         return;
       }
 
-      setMember(found as Member);
+      setMember(data as Member);
       setVerifiedAt(new Date());
     } catch (error: any) {
       console.error("QR VERIFY ERROR:", error);
+
+      setMember(null);
+      setVerifiedAt(null);
 
       alert(
         "QR Verification failed\\n\\n" +
@@ -221,9 +156,7 @@ function VerifyPageContent() {
   ) {
     if (e.key === "Enter") {
       const qrId =
-        searchParams.get("id") ||
-        searchParams.get("member_id") ||
-        searchParams.get("application_id");
+        searchParams.get("id");
 
       if (qrId) {
         verifyMember(qrId);
@@ -412,9 +345,7 @@ function VerifyPageContent() {
             type="button"
             onClick={() => {
               const qrId =
-                searchParams.get("id") ||
-                searchParams.get("member_id") ||
-                searchParams.get("application_id");
+                searchParams.get("id");
 
               if (qrId) {
                 verifyMember(qrId);
