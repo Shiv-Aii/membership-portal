@@ -67,7 +67,6 @@ function VerifyPageContent() {
 
   useEffect(() => {
     const qrNumber =
-      searchParams.get("membership_number") ||
       searchParams.get("membership") ||
       searchParams.get("membership_no") ||
       searchParams.get("number") ||
@@ -79,11 +78,11 @@ function VerifyPageContent() {
       searchParams.get("application_id");
 
     if (qrNumber || qrMemberId) {
-      const value = qrNumber || "";
-      setNumber(value);
+      setNumber(qrNumber || "");
 
-      // QR scan ಆದಾಗ number/member id ಮೂಲಕ direct verification.
-      verifyMember(value, qrMemberId || undefined);
+      // QR scan: verify the exact applications record first.
+      // Manual membership-number verification remains unchanged.
+      verifyMember(qrNumber || undefined, qrMemberId || undefined);
     }
   }, [searchParams]);
 
@@ -98,7 +97,7 @@ function VerifyPageContent() {
     const cleanNumber =
       (inputNumber ?? number).trim();
 
-    if (!cleanNumber) {
+    if (!cleanNumber && !inputMemberId) {
       alert(
         "Membership Number ಹಾಕಿ."
       );
@@ -124,8 +123,8 @@ function VerifyPageContent() {
       let data: any = null;
       let error: any = null;
 
-      // QR code carries the original application/member id.
-      // Use that first so the QR always identifies the exact card member.
+      // QR contains the applications.id from the card page.
+      // Use that exact record first.
       if (inputMemberId) {
         const result = await supabase
           .from("applications")
@@ -139,8 +138,7 @@ function VerifyPageContent() {
         error = result.error;
       }
 
-      // If id was not present or did not find the member,
-      // fall back to the membership number verification.
+      // Manual verification / older QR fallback.
       if (!data && !error && cleanNumber) {
         const result = await supabase
           .from("applications")
