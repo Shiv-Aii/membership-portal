@@ -972,63 +972,69 @@ return () => {
 */
 
 useEffect(() => {
-  async function createQR() {
-    try {
-      const membershipNumber = textValue(
-        memberData,
-        [
-          "membership_no",
-          "membership_number",
-          "member_number",
-          "member_no",
-          "membership_id",
-          "card_number",
-        ],
-        ""
-      ).trim();
+async function createQR() {
+try {
+let membershipNumber = "";
 
-      if (!membershipNumber) {
-        setQrImage("");
-        return;
-      }
+if (memberId) {
+const { data, error } = await supabase
+.from("applications")
+.select("membership_no")
+.eq("id", memberId)
+.maybeSingle();
 
-      const params = new URLSearchParams();
+if (!error && data?.membership_no != null) {
+membershipNumber = String(data.membership_no).trim();
+}
+}
 
-      // IMPORTANT:
-      // Verify page databaseನಲ್ಲಿ applications.membership_no
-      // ಮೂಲಕ member ಹುಡುಕುತ್ತದೆ.
-      params.set("membership_no", membershipNumber);
+if (!membershipNumber && memberData) {
+membershipNumber = textValue(
+memberData,
+[
+"membership_no",
+"membership_number",
+"member_number",
+"member_no",
+"membership_id",
+"card_number",
+],
+""
+).trim();
+}
 
-      const url =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/verify?${params.toString()}`
-          : `/verify?${params.toString()}`;
+if (!membershipNumber) {
+setQrImage("");
+return;
+}
 
-      const image = await QRCode.toDataURL(
-        url,
-        {
-          width: 500,
-          margin: 1,
-          errorCorrectionLevel: "H",
-          color: {
-            dark: "#075c2b",
-            light: "#ffffff",
-          },
-        }
-      );
+const params = new URLSearchParams();
+params.set("membership_no", membershipNumber);
 
-      setQrImage(image);
-    } catch (error) {
-      console.error(
-        "QR generation error:",
-        error
-      );
-      setQrImage("");
-    }
-  }
+const url =
+typeof window !== "undefined"
+? `${window.location.origin}/verify?${params.toString()}`
+: `/verify?${params.toString()}`;
 
-  createQR();
-}, [memberData]);
+const image = await QRCode.toDataURL(url, {
+width: 500,
+margin: 1,
+errorCorrectionLevel: "H",
+color: {
+dark: "#075c2b",
+light: "#ffffff",
+},
+});
+
+setQrImage(image);
+} catch (error) {
+console.error("QR generation error:", error);
+setQrImage("");
+}
+}
+
+createQR();
+}, [memberData, memberId]);
 /*
 
 # UPDATE ELEMENT
