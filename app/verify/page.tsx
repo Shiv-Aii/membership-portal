@@ -61,53 +61,34 @@ function VerifyPageContent() {
     useState<Date | null>(null);
 
   /* ===================================================
-     GET MEMBERSHIP NUMBER FROM QR URL
- 
-     Example:
-     /verify?membership=11
+     GET UNIQUE MEMBER ID FROM QR URL
+
+     QR format created by Card Page:
+     /verify?id=<unique-member-id>
   =================================================== */
 
   useEffect(() => {
-    const qrNumber =
-      searchParams.get("membership") ||
-      searchParams.get("membership_no") ||
-      searchParams.get("number") ||
-      searchParams.get("member");
-
     const qrId =
       searchParams.get("id") ||
       searchParams.get("member_id") ||
       searchParams.get("application_id");
 
-    if (qrNumber || qrId) {
-      if (qrNumber) {
-        setNumber(qrNumber);
-      }
-
-      // QR scan ಆದಾಗ ಅದೇ member/application ID ಮೂಲಕ
-      // direct verification ಆಗಬೇಕು.
-      verifyMember(qrNumber ?? undefined, qrId ?? undefined);
+    if (qrId) {
+      verifyMember(qrId);
     }
   }, [searchParams]);
 
   /* ===================================================
      VERIFY MEMBER
+     QR verification uses the unique member/application ID only.
+     Membership Number is NOT used for QR verification.
   =================================================== */
 
-  async function verifyMember(
-    inputNumber?: string,
-    inputId?: string | null
-  ) {
-    const cleanNumber =
-      (inputNumber ?? number).trim();
+  async function verifyMember(inputId?: string | null) {
+    const cleanId = (inputId ?? "").trim();
 
-    const cleanId =
-      (inputId ?? "").trim();
-
-    if (!cleanNumber && !cleanId) {
-      alert(
-        "Membership Number ಹಾಕಿ."
-      );
+    if (!cleanId) {
+      alert("QR Code valid member ID ಹೊಂದಿಲ್ಲ.");
       return;
     }
 
@@ -128,20 +109,9 @@ function VerifyPageContent() {
         "member_profiles",
       ];
 
-      const membershipColumns = [
-        "membership_number",
-        "membership_no",
-        "member_number",
-        "member_no",
-        "membership_id",
-        "card_number",
-      ];
-
-      function isActiveApproved(row: any): boolean {
+      function isApproved(row: any): boolean {
         if (!row) return false;
 
-        // Match the existing Admin > Members page:
-        // an application is verifiable when status is "approved".
         if (row.status !== undefined && row.status !== null) {
           return String(row.status).toLowerCase() === "approved";
         }
@@ -149,60 +119,31 @@ function VerifyPageContent() {
         return false;
       }
 
-      // QR scan: first use the exact ID encoded in the QR.
-      if (cleanId) {
-        for (const table of tables) {
-          try {
-            const { data, error } = await supabase
-              .from(table)
-              .select("*")
-              .eq("id", cleanId)
-              .maybeSingle();
+      // QR verification:
+      // The unique ID inside the QR is the ONLY identifier used.
+      for (const table of tables) {
+        try {
+          const { data, error } = await supabase
+            .from(table)
+            .select("*")
+            .eq("id", cleanId)
+            .maybeSingle();
 
-            if (error) {
-              lastError = error;
-              continue;
-            }
-
-            if (data && isActiveApproved(data)) {
-              found = data;
-              break;
-            }
-          } catch (tableError) {
-            lastError = tableError;
+          if (error) {
+            lastError = error;
+            continue;
           }
+
+          if (data && isApproved(data)) {
+            found = data;
+            break;
+          }
+        } catch (tableError) {
+          lastError = tableError;
         }
       }
 
-      // Manual Membership Number / QR fallback.
-      if (!found && cleanNumber) {
-        for (const table of tables) {
-          for (const column of membershipColumns) {
-            try {
-              const { data, error } = await supabase
-                .from(table)
-                .select("*")
-                .eq(column, cleanNumber)
-                .maybeSingle();
-
-              if (error) {
-                lastError = error;
-                continue;
-              }
-
-              if (data && isActiveApproved(data)) {
-                found = data;
-                break;
-              }
-            } catch (columnError) {
-              lastError = columnError;
-            }
-          }
-
-          if (found) break;
-        }
-      }
-
+      console.log("QR VERIFY ID:", cleanId);
       console.log("VERIFY RESULT:", found);
       console.log("VERIFY ERROR:", lastError);
 
@@ -215,9 +156,10 @@ function VerifyPageContent() {
       setMember(found as Member);
       setVerifiedAt(new Date());
     } catch (error: any) {
-      console.error("VERIFY ERROR:", error);
+      console.error("QR VERIFY ERROR:", error);
+
       alert(
-        "Verification failed\n\n" +
+        "QR Verification failed\n\n" +
           (error?.message || "Unknown error")
       );
     } finally {
@@ -233,7 +175,14 @@ function VerifyPageContent() {
     e: React.KeyboardEvent<HTMLInputElement>
   ) {
     if (e.key === "Enter") {
-      verifyMember();
+      const qrId =
+        searchParams.get("id") ||
+        searchParams.get("member_id") ||
+        searchParams.get("application_id");
+
+      if (qrId) {
+        verifyMember(qrId);
+      }
     }
   }
 
@@ -416,9 +365,18 @@ function VerifyPageContent() {
 
           <button
             type="button"
-            onClick={() =>
-              verifyMember()
-            }
+            onClick={() => {
+              const qrId =
+                searchParams.get("id") ||
+                searchParams.get("member_id") ||
+                searchParams.get("application_id");
+
+              if (qrId) {
+                verifyMember(qrId);
+              } else {
+                alert("QR Code ಮೂಲಕ ಮಾತ್ರ Member Verification ಮಾಡಬಹುದು.");
+              }
+            }}
             disabled={loading}
             className="
               w-full
