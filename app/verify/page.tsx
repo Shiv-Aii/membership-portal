@@ -33,6 +33,14 @@ type Member = {
 
   is_active?: boolean;
 
+  valid_till?: string | number | null;
+  valid_till_date?: string | number | null;
+  valid_until?: string | number | null;
+  expiry_date?: string | number | null;
+  membership_expiry?: string | number | null;
+  expires_at?: string | number | null;
+  end_date?: string | number | null;
+
   title?: string;
   description?: string;
 };
@@ -58,27 +66,30 @@ function VerifyPageContent() {
   const [verifiedAt, setVerifiedAt] =
     useState<Date | null>(null);
 
+  const [notValid, setNotValid] =
+    useState(false);
+
   /* ===================================================
-     GET MEMBERSHIP / MEMBER ID FROM QR URL
+     GET MEMBERSHIP NUMBER FROM QR URL
+     
+     Example:
+     /verify?membership=11
   =================================================== */
 
   useEffect(() => {
-    const qrMembership =
+    const qrNumber =
       searchParams.get("membership") ||
       searchParams.get("membership_no") ||
       searchParams.get("number") ||
       searchParams.get("member");
 
-    const qrMemberId =
-      searchParams.get("id") ||
-      searchParams.get("member_id") ||
-      searchParams.get("application_id");
+    if (qrNumber) {
+      const cleanQrNumber = qrNumber.trim();
 
-    if (qrMembership || qrMemberId) {
-      setNumber(qrMembership || qrMemberId || "");
+      setNumber(cleanQrNumber);
 
-      // QR scan ಆದಾಗ automatic verification
-      verifyMember(qrMembership || "", qrMemberId || "");
+      // QR scan ಆದಾಗ automatic verification.
+      verifyMember(cleanQrNumber);
     }
   }, [searchParams]);
 
@@ -86,18 +97,15 @@ function VerifyPageContent() {
      VERIFY MEMBER
   =================================================== */
 
-  async function verifyMember(
-    inputNumber?: string,
-    inputMemberId?: string
-  ) {
+  async function verifyMember(inputNumber?: string) {
     const cleanNumber =
       (inputNumber ?? number).trim();
 
-    const cleanMemberId =
-      (inputMemberId ?? "").trim();
+    if (!cleanNumber) {
+      alert(
+        "Membership Number ಹಾಕಿ."
+      );
 
-    if (!cleanNumber && !cleanMemberId) {
-      alert("Membership Number ಹಾಕಿ.");
       return;
     }
 
@@ -106,50 +114,41 @@ function VerifyPageContent() {
 
     setMember(null);
     setVerifiedAt(null);
+    setNotValid(false);
 
     try {
-      let result: any = null;
-      let error: any = null;
-
       /*
-       * QR scan ಆದಾಗ ಮೊದಲು member/application ID ಮೂಲಕ
-       * ಅದೇ approved member ಅನ್ನು ಹುಡುಕುತ್ತದೆ.
+       * Verify directly from the existing applications table.
+       *
+       * Existing setup: an approved active member has
+       * status = "approved" and is_deleted = false.
+       * No new RPC/function is required.
        */
-      if (cleanMemberId) {
-        const response = await supabase
-          .from("applications")
-          .select("*")
-          .eq("id", cleanMemberId)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
 
-        result = response.data;
-        error = response.error;
-      }
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("membership_no", cleanNumber)
+        .maybeSingle();
 
-      /*
-       * ID ಮೂಲಕ ಸಿಗದಿದ್ದರೆ Membership Number ಮೂಲಕ
-       * existing verification ಮುಂದುವರಿಯುತ್ತದೆ.
-       */
-      if (!result && !error && cleanNumber) {
-        const response = await supabase
-          .from("applications")
-          .select("*")
-          .eq("membership_no", cleanNumber)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
+      console.log(
+        "VERIFY RESULT:",
+        data
+      );
 
-        result = response.data;
-        error = response.error;
-      }
-
-      console.log("VERIFY RESULT:", result);
-      console.log("VERIFY ERROR:", error);
+      console.log(
+        "VERIFY ERROR:",
+        error
+      );
 
       if (error) {
-        console.error("Verification error:", error);
+        console.error(
+          "Verification error:",
+          error
+        );
 
         alert(
           "Verification error:\n\n" +
@@ -159,18 +158,128 @@ function VerifyPageContent() {
         return;
       }
 
+      const result: any = data;
+
+      /*
+       * Member ಸಿಗಲಿಲ್ಲ
+       */
+
       if (!result) {
         setMember(null);
         setVerifiedAt(null);
+        setNotValid(false);
+
         return;
       }
 
-      setMember(result as Member);
+      /*
+       * Existing approval/deleted rules.
+       */
+      const isApproved =
+        String(result.status ?? "")
+          .trim()
+          .toLowerCase() === "approved";
 
-      setVerifiedAt(new Date());
+      const isDeleted =
+        result.is_deleted === true;
+
+      if (!isApproved || isDeleted) {
+        setMember(null);
+        setVerifiedAt(null);
+        setNotValid(false);
+
+        return;
+      }
+
+      /*
+       * Existing card code uses these expiry fields:
+       * valid_till, valid_till_date, valid_until,
+       * expiry_date, membership_expiry, expires_at, end_date.
+       */
+      const expiryValue =
+        result.valid_till ??
+        result.valid_till_date ??
+        result.valid_until ??
+        result.expiry_date ??
+        result.membership_expiry ??
+        result.expires_at ??
+        result.end_date ??
+        null;
+
+      if (expiryValue) {
+        const rawExpiry =
+          String(expiryValue).trim();
+
+        let expiryDate: Date | null = null;
+
+        /*
+         * DD-MM-YYYY / DD/MM/YYYY
+         */
+        const ddmmyyyy =
+          rawExpiry.match(
+            /^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/
+          );
+
+        if (ddmmyyyy) {
+          const day = Number(ddmmyyyy[1]);
+          const month = Number(ddmmyyyy[2]);
+          const year = Number(ddmmyyyy[3]);
+
+          expiryDate = new Date(
+            year,
+            month - 1,
+            day,
+            23,
+            59,
+            59,
+            999
+          );
+        } else {
+          const parsed = new Date(rawExpiry);
+
+          if (!Number.isNaN(parsed.getTime())) {
+            expiryDate = parsed;
+            expiryDate.setHours(
+              23,
+              59,
+              59,
+              999
+            );
+          }
+        }
+
+        /*
+         * Expiry ಮುಗಿದಿದ್ದರೆ NOT VALID.
+         */
+        if (
+          expiryDate &&
+          new Date().getTime() >
+            expiryDate.getTime()
+        ) {
+          setMember(null);
+          setVerifiedAt(null);
+          setNotValid(true);
+
+          return;
+        }
+      }
+
+      /*
+       * Valid member.
+       */
+      setMember(
+        result as Member
+      );
+
+      setVerifiedAt(
+        new Date()
+      );
 
     } catch (error: any) {
-      console.error("VERIFY ERROR:", error);
+      console.error(
+        "VERIFY ERROR:",
+        error
+      );
 
       alert(
         "Verification failed.\n\n" +
@@ -184,7 +293,6 @@ function VerifyPageContent() {
       setLoading(false);
     }
   }
-
 
   /* ===================================================
      ENTER KEY
@@ -769,7 +877,9 @@ function VerifyPageContent() {
               text-slate-900
               mt-6
             ">
-              Member Not Found
+              {notValid
+                ? "NOT VALID"
+                : "Member Not Found"}
             </h2>
 
             <p className="
@@ -777,9 +887,9 @@ function VerifyPageContent() {
               text-lg
               mt-4
             ">
-              ಈ Membership Numberಗೆ
-              approved active member
-              ಸಿಗಲಿಲ್ಲ.
+              {notValid
+                ? "ಈ Membership Card ನ validity ಮುಗಿದಿದೆ."
+                : "ಈ Membership Numberಗೆ approved active member ಸಿಗಲಿಲ್ಲ."}
             </p>
 
             <p className="
