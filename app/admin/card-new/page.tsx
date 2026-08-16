@@ -195,13 +195,8 @@ function applyMemberDataToElements(
 
   const vehicleNumber = textValue(
     member,
-    [
-      "vehicle_number",
-      "vehicle_no",
-      "vehicleNumber",
-      "vehicle",
-    ],
-    "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number"
+    ["vehicle_number"],
+    ""
   );
 
   const validFrom = dateValue(
@@ -250,7 +245,12 @@ function applyMemberDataToElements(
       case "aadhaar":
         return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
       case "vehicle-number":
-        return { ...element, text: `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}` };
+        return {
+          ...element,
+          text: vehicleNumber
+            ? `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}`
+            : "",
+        };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -444,7 +444,7 @@ const initialElements: CardElement[] = [
     id: "vehicle-number",
     label: "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number",
     kind: "text",
-    text: "ವಾಹನ ಸಂಖ್ಯೆ : Vehicle Number",
+    text: "",
     side: "front",
     x: 255,
     y: 431,
