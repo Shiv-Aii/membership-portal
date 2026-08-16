@@ -16,6 +16,8 @@ type Member = {
 
   name?: string;
   membership_no?: string | number;
+  membership_number?: string | number;
+  status?: string;
 
   designation?: string;
   village?: string;
@@ -84,7 +86,7 @@ function VerifyPageContent() {
 
       // QR scan ಆದಾಗ ಅದೇ member/application ID ಮೂಲಕ
       // direct verification ಆಗಬೇಕು.
-      verifyMember(qrNumber ?? undefined, qrId ?? undefined);
+      verifyMember(qrNumber, qrId);
     }
   }, [searchParams]);
 
@@ -106,121 +108,117 @@ function VerifyPageContent() {
       alert(
         "Membership Number ಹಾಕಿ."
       );
-
       return;
     }
 
     setLoading(true);
     setSearched(true);
-
     setMember(null);
     setVerifiedAt(null);
 
     try {
-      /*
-       * Verify directly from the existing applications table.
-       *
-       * Existing setup: an approved active member has
-       * status = "approved" and is_deleted = false.
-       * No new RPC/function is required.
-       */
+      let found: any = null;
+      let lastError: any = null;
 
-      let data: any = null;
-      let error: any = null;
+      const tables = [
+        "applications",
+        "members",
+        "membership_applications",
+        "member_applications",
+        "member_profiles",
+      ];
 
-      // QR code contains the exact application/member ID.
-      // First verify using that ID so the QR always opens
-      // the same member whose card was scanned.
+      const membershipColumns = [
+        "membership_number",
+        "membership_no",
+        "member_number",
+        "member_no",
+        "membership_id",
+        "card_number",
+      ];
+
+      function isActiveApproved(row: any): boolean {
+        if (!row) return false;
+        if (row.is_deleted === true) return false;
+        if (row.is_active === false) return false;
+        if (row.status !== undefined && row.status !== null) {
+          const status = String(row.status).toLowerCase();
+          return status === "approved" || status === "active";
+        }
+        return true;
+      }
+
+      // QR scan: first use the exact ID encoded in the QR.
       if (cleanId) {
-        const result = await supabase
-          .from("applications")
-          .select("*")
-          .eq("id", cleanId)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
+        for (const table of tables) {
+          try {
+            const { data, error } = await supabase
+              .from(table)
+              .select("*")
+              .eq("id", cleanId)
+              .maybeSingle();
 
-        data = result.data;
-        error = result.error;
+            if (error) {
+              lastError = error;
+              continue;
+            }
+
+            if (data && isActiveApproved(data)) {
+              found = data;
+              break;
+            }
+          } catch (tableError) {
+            lastError = tableError;
+          }
+        }
       }
 
-      // Normal membership-number verification remains unchanged.
-      if (!error && !data && cleanNumber) {
-        const result = await supabase
-          .from("applications")
-          .select("*")
-          .eq("membership_no", cleanNumber)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
+      // Manual Membership Number / QR fallback.
+      if (!found && cleanNumber) {
+        for (const table of tables) {
+          for (const column of membershipColumns) {
+            try {
+              const { data, error } = await supabase
+                .from(table)
+                .select("*")
+                .eq(column, cleanNumber)
+                .maybeSingle();
 
-        data = result.data;
-        error = result.error;
+              if (error) {
+                lastError = error;
+                continue;
+              }
+
+              if (data && isActiveApproved(data)) {
+                found = data;
+                break;
+              }
+            } catch (columnError) {
+              lastError = columnError;
+            }
+          }
+
+          if (found) break;
+        }
       }
 
-      console.log(
-        "VERIFY RESULT:",
-        data
-      );
+      console.log("VERIFY RESULT:", found);
+      console.log("VERIFY ERROR:", lastError);
 
-      console.log(
-        "VERIFY ERROR:",
-        error
-      );
-
-      if (error) {
-        console.error(
-          "Verification error:",
-          error
-        );
-
-        alert(
-          "Verification error:\n\n" +
-            error.message
-        );
-
-        return;
-      }
-
-      const result: any = data;
-
-      /*
-       * Member ಸಿಗಲಿಲ್ಲ
-       */
-
-      if (!result) {
+      if (!found) {
         setMember(null);
         setVerifiedAt(null);
-
         return;
       }
 
-      /*
-       * Member ಸಿಕ್ಕಿದೆ
-       */
-
-      setMember(
-        result as Member
-      );
-
-      setVerifiedAt(
-        new Date()
-      );
-
+      setMember(found as Member);
+      setVerifiedAt(new Date());
     } catch (error: any) {
-      console.error(
-        "VERIFY ERROR:",
-        error
-      );
-
+      console.error("VERIFY ERROR:", error);
       alert(
-        "Verification failed.\n\n" +
-          (
-            error?.message ||
-            "Unknown error"
-          )
+        "Verification failed\n\n" +
+          (error?.message || "Unknown error")
       );
-
     } finally {
       setLoading(false);
     }
