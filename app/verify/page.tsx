@@ -59,25 +59,26 @@ function VerifyPageContent() {
     useState<Date | null>(null);
 
   /* ===================================================
-     GET MEMBERSHIP NUMBER FROM QR URL
-     
-     Example:
-     /verify?membership=11
+     GET MEMBERSHIP / MEMBER ID FROM QR URL
   =================================================== */
 
   useEffect(() => {
-    const qrNumber =
+    const qrMembership =
       searchParams.get("membership") ||
       searchParams.get("membership_no") ||
       searchParams.get("number") ||
       searchParams.get("member");
 
-    if (qrNumber) {
-      setNumber(qrNumber);
+    const qrMemberId =
+      searchParams.get("id") ||
+      searchParams.get("member_id") ||
+      searchParams.get("application_id");
 
-      // QR scan ಆದಾಗ number ಮಾತ್ರ fill ಆಗಬಾರದು.
-      // Direct verification ಕೂಡ automatically ಆಗಬೇಕು.
-      verifyMember(qrNumber);
+    if (qrMembership || qrMemberId) {
+      setNumber(qrMembership || qrMemberId || "");
+
+      // QR scan ಆದಾಗ automatic verification
+      verifyMember(qrMembership || "", qrMemberId || "");
     }
   }, [searchParams]);
 
@@ -85,15 +86,18 @@ function VerifyPageContent() {
      VERIFY MEMBER
   =================================================== */
 
-  async function verifyMember(inputNumber?: string) {
+  async function verifyMember(
+    inputNumber?: string,
+    inputMemberId?: string
+  ) {
     const cleanNumber =
       (inputNumber ?? number).trim();
 
-    if (!cleanNumber) {
-      alert(
-        "Membership Number ಹಾಕಿ."
-      );
+    const cleanMemberId =
+      (inputMemberId ?? "").trim();
 
+    if (!cleanNumber && !cleanMemberId) {
+      alert("Membership Number ಹಾಕಿ.");
       return;
     }
 
@@ -104,40 +108,48 @@ function VerifyPageContent() {
     setVerifiedAt(null);
 
     try {
+      let result: any = null;
+      let error: any = null;
+
       /*
-       * Verify directly from the existing applications table.
-       *
-       * Existing setup: an approved active member has
-       * status = "approved" and is_deleted = false.
-       * No new RPC/function is required.
+       * QR scan ಆದಾಗ ಮೊದಲು member/application ID ಮೂಲಕ
+       * ಅದೇ approved member ಅನ್ನು ಹುಡುಕುತ್ತದೆ.
        */
+      if (cleanMemberId) {
+        const response = await supabase
+          .from("applications")
+          .select("*")
+          .eq("id", cleanMemberId)
+          .eq("status", "approved")
+          .eq("is_deleted", false)
+          .maybeSingle();
 
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("membership_no", cleanNumber)
-        .eq("status", "approved")
-        .eq("is_deleted", false)
-        .maybeSingle();
+        result = response.data;
+        error = response.error;
+      }
 
-      console.log(
-        "VERIFY RESULT:",
-        data
-      );
+      /*
+       * ID ಮೂಲಕ ಸಿಗದಿದ್ದರೆ Membership Number ಮೂಲಕ
+       * existing verification ಮುಂದುವರಿಯುತ್ತದೆ.
+       */
+      if (!result && !error && cleanNumber) {
+        const response = await supabase
+          .from("applications")
+          .select("*")
+          .eq("membership_no", cleanNumber)
+          .eq("status", "approved")
+          .eq("is_deleted", false)
+          .maybeSingle();
 
-      console.log(
-        "VERIFY ERROR:",
-        error
-      );
+        result = response.data;
+        error = response.error;
+      }
+
+      console.log("VERIFY RESULT:", result);
+      console.log("VERIFY ERROR:", error);
 
       if (error) {
-        console.error(
-          "Verification error:",
-          error
-        );
+        console.error("Verification error:", error);
 
         alert(
           "Verification error:\n\n" +
@@ -147,36 +159,18 @@ function VerifyPageContent() {
         return;
       }
 
-      const result: any = data;
-
-      /*
-       * Member ಸಿಗಲಿಲ್ಲ
-       */
-
       if (!result) {
         setMember(null);
         setVerifiedAt(null);
-
         return;
       }
 
-      /*
-       * Member ಸಿಕ್ಕಿದೆ
-       */
+      setMember(result as Member);
 
-      setMember(
-        result as Member
-      );
-
-      setVerifiedAt(
-        new Date()
-      );
+      setVerifiedAt(new Date());
 
     } catch (error: any) {
-      console.error(
-        "VERIFY ERROR:",
-        error
-      );
+      console.error("VERIFY ERROR:", error);
 
       alert(
         "Verification failed.\n\n" +
@@ -190,6 +184,7 @@ function VerifyPageContent() {
       setLoading(false);
     }
   }
+
 
   /* ===================================================
      ENTER KEY
