@@ -60,7 +60,7 @@ function VerifyPageContent() {
 
   /* ===================================================
      GET MEMBERSHIP NUMBER FROM QR URL
-     
+ 
      Example:
      /verify?membership=11
   =================================================== */
@@ -72,17 +72,12 @@ function VerifyPageContent() {
       searchParams.get("number") ||
       searchParams.get("member");
 
-    const qrMemberId =
-      searchParams.get("id") ||
-      searchParams.get("member_id") ||
-      searchParams.get("application_id");
+    if (qrNumber) {
+      setNumber(qrNumber);
 
-    if (qrNumber || qrMemberId) {
-      setNumber(qrNumber || "");
-
-      // QR scan: verify the exact applications record first.
-      // Manual membership-number verification remains unchanged.
-      verifyMember(qrNumber || undefined, qrMemberId || undefined);
+      // QR scan ಆದಾಗ number ಮಾತ್ರ fill ಆಗಬಾರದು.
+      // Direct verification ಕೂಡ automatically ಆಗಬೇಕು.
+      verifyMember(qrNumber);
     }
   }, [searchParams]);
 
@@ -90,14 +85,11 @@ function VerifyPageContent() {
      VERIFY MEMBER
   =================================================== */
 
-  async function verifyMember(
-    inputNumber?: string,
-    inputMemberId?: string
-  ) {
+  async function verifyMember(inputNumber?: string) {
     const cleanNumber =
       (inputNumber ?? number).trim();
 
-    if (!cleanNumber && !inputMemberId) {
+    if (!cleanNumber) {
       alert(
         "Membership Number ಹಾಕಿ."
       );
@@ -120,37 +112,16 @@ function VerifyPageContent() {
        * No new RPC/function is required.
        */
 
-      let data: any = null;
-      let error: any = null;
-
-      // QR contains the applications.id from the card page.
-      // Use that exact record first.
-      if (inputMemberId) {
-        const result = await supabase
-          .from("applications")
-          .select("*")
-          .eq("id", inputMemberId)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
-
-        data = result.data;
-        error = result.error;
-      }
-
-      // Manual verification / older QR fallback.
-      if (!data && !error && cleanNumber) {
-        const result = await supabase
-          .from("applications")
-          .select("*")
-          .eq("membership_no", cleanNumber)
-          .eq("status", "approved")
-          .eq("is_deleted", false)
-          .maybeSingle();
-
-        data = result.data;
-        error = result.error;
-      }
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("membership_no", cleanNumber)
+        .eq("status", "approved")
+        .eq("is_deleted", false)
+        .maybeSingle();
 
       console.log(
         "VERIFY RESULT:",
@@ -760,9 +731,9 @@ function VerifyPageContent() {
                 ">
 
                   Verified on:{" "}
-                  <b>
+                  
                     {verifiedDateTime}
-                  </b>
+                  
 
                 </div>
 
@@ -821,9 +792,9 @@ function VerifyPageContent() {
               mt-3
             ">
               Membership Number:{" "}
-              <b>
+              
                 {number}
-              </b>
+              
             </p>
 
           </section>
