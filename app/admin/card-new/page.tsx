@@ -15,11 +15,11 @@ import { supabase } from "@/lib/supabase";
 type Side = "front" | "back";
 
 type ElementKind =
-\| "text"
-\| "photo"
-\| "qr"
-\| "image"
-\| "footer";
+| "text"
+| "photo"
+| "qr"
+| "image"
+| "footer";
 
 type CardElement = {
 id: string;
@@ -42,26 +42,26 @@ borderRadius?: number;
 src?: string;
 };
 
-const CARD\_WIDTH = 856;
-const CARD\_HEIGHT = 539;
+const CARD_WIDTH = 856;
+const CARD_HEIGHT = 539;
 
-const TEMPLATE\_NAME = "Farmer PVC Card";
+const TEMPLATE_NAME = "Farmer PVC Card";
 
-/\* ==================================================
+/* ==================================================
 MEMBER DATA
-The card-new page is opened as /admin/card-new?id=\<UUID>.
+The card-new page is opened as /admin/card-new?id=<UUID>.
 We try the common member/application tables and map
 whichever columns exist to the card fields.
-\================================================== \*/
+================================================== */
 
-type MemberRecord = Record\<string, any>;
+type MemberRecord = Record<string, any>;
 
-const MEMBER\_TABLES = [
+const MEMBER_TABLES = [
 "members",
 "applications",
-"membership\_applications",
-"member\_applications",
-"member\_profiles",
+"membership_applications",
+"member_applications",
+"member_profiles",
 ];
 
 function firstValue(
@@ -113,11 +113,11 @@ member: MemberRecord
 const name = textValue(
 member,
 [
-"full\_name",
-"member\_name",
-"applicant\_name",
+"full_name",
+"member_name",
+"applicant_name",
 "name",
-"kannada\_name",
+"kannada_name",
 "fullName",
 ],
 "ಸದಸ್ಯರ ಹೆಸರು"
@@ -126,12 +126,12 @@ member,
 const membership = textValue(
 member,
 [
-"membership\_number",
-"membership\_no",
-"member\_number",
-"member\_no",
-"membership\_id",
-"card\_number",
+"membership_number",
+"membership_no",
+"member_number",
+"member_no",
+"membership_id",
+"card_number",
 ],
 "Membership Number"
 );
@@ -142,27 +142,27 @@ member,
 "designation",
 "post",
 "role",
-"member\_designation",
-"designation\_name",
+"member_designation",
+"designation_name",
 ],
 "ಹುದ್ದೆ / Designation"
 );
 
 const village = textValue(
 member,
-["village", "village\_name", "gram", "gram\_name"],
+["village", "village_name", "gram", "gram_name"],
 "ಗ್ರಾಮ / Village"
 );
 
 const taluk = textValue(
 member,
-["taluk", "taluk\_name", "talukName"],
+["taluk", "taluk_name", "talukName"],
 "ತಾಲ್ಲೂಕು / Taluk"
 );
 
 const district = textValue(
 member,
-["district", "district\_name", "districtName"],
+["district", "district_name", "districtName"],
 "ಜಿಲ್ಲೆ / District"
 );
 
@@ -170,10 +170,10 @@ const mobile = textValue(
 member,
 [
 "mobile",
-"mobile\_number",
+"mobile_number",
 "phone",
-"phone\_number",
-"contact\_number",
+"phone_number",
+"contact_number",
 ],
 "ಮೊಬೈಲ್ / Mobile Number"
 );
@@ -181,12 +181,12 @@ member,
 const aadhaar = textValue(
 member,
 [
-"aadhaar\_number",
-"aadhar\_number",
+"aadhaar_number",
+"aadhar_number",
 "aadhaar",
 "aadhar",
-"aadhaar\_no",
-"aadhar\_no",
+"aadhaar_no",
+"aadhar_no",
 "aadhaarNumber",
 "aadharNumber",
 ],
@@ -196,8 +196,8 @@ member,
 const vehicleNumber = textValue(
 member,
 [
-"vehicle\_number",
-"vehicle\_no",
+"vehicle_number",
+"vehicle_no",
 "vehicleNumber",
 "vehicle",
 ],
@@ -207,12 +207,12 @@ member,
 const validFrom = dateValue(
 member,
 [
-"valid\_from",
-"valid\_from\_date",
-"membership\_from",
-"start\_date",
-"approved\_date",
-"approval\_date",
+"valid_from",
+"valid_from_date",
+"membership_from",
+"start_date",
+"approved_date",
+"approval_date",
 ],
 "13-08-2026"
 );
@@ -220,13 +220,13 @@ member,
 const validTill = dateValue(
 member,
 [
-"valid\_till",
-"valid\_till\_date",
-"valid\_until",
-"expiry\_date",
-"membership\_expiry",
-"expires\_at",
-"end\_date",
+"valid_till",
+"valid_till_date",
+"valid_until",
+"expiry_date",
+"membership_expiry",
+"expires_at",
+"end_date",
 ],
 "12-08-2027"
 );
@@ -645,14 +645,14 @@ return elements.map((e) => ({
 }));
 }
 
-/\* ==================================================
+/* ==================================================
 MASTER TEMPLATE SANITIZER
 
 Member values are displayed on the current card, but
 they must NEVER be saved into the master template.
 Only the design/position/style is saved.
-\================================================== \*/
-const MEMBER\_DATA\_ELEMENT\_IDS = new Set([
+================================================== */
+const MEMBER_DATA_ELEMENT_IDS = new Set([
 "name",
 "membership",
 "designation",
@@ -676,11 +676,10 @@ initialElements.map((element) => [element.id, element])
 );
 
 return current.map((element) => {
-if (!MEMBER\_DATA\_ELEMENT\_IDS.has(element.id)) {
+if (!MEMBER_DATA_ELEMENT_IDS.has(element.id)) {
 return { ...element };
 }
 
-```
 const original = initialById.get(element.id);
 
 if (!original) {
@@ -694,16 +693,14 @@ return {
   ...element,
   text: original.text,
 };
-```
 
 });
 }
 
-function fileToDataUrl(file: File): Promise\<string> {
+function fileToDataUrl(file: File): Promise<string> {
 return new Promise((resolve, reject) => {
 const reader = new FileReader();
 
-```
 reader.onload = () => {
   resolve(String(reader.result));
 };
@@ -711,28 +708,27 @@ reader.onload = () => {
 reader.onerror = reject;
 
 reader.readAsDataURL(file);
-```
 
 });
 }
 
 function NewCardDesignerPageContent() {
-const [elements, setElements] = useState\<CardElement[]>(
+const [elements, setElements] = useState<CardElement[]>(
 cloneElements(initialElements)
 );
 
-const [side, setSide] = useState\<Side>("front");
+const [side, setSide] = useState<Side>("front");
 
 const [selectedId, setSelectedId] =
-useState\<string | null>("name");
+useState<string | null>("name");
 
 const [memberPhoto, setMemberPhoto] =
-useState\<string | null>(null);
+useState<string | null>(null);
 
 const [qrImage, setQrImage] = useState("");
 
 const [templateId, setTemplateId] =
-useState\<number | null>(null);
+useState<number | null>(null);
 
 const [locked, setLocked] = useState(false);
 
@@ -744,30 +740,28 @@ const [saving, setSaving] = useState(false);
 const searchParams = useSearchParams();
 const memberId =
 searchParams.get("id") ||
-searchParams.get("member\_id") ||
-searchParams.get("application\_id") ||
+searchParams.get("member_id") ||
+searchParams.get("application_id") ||
 "";
 
 const [memberData, setMemberData] =
-useState\<MemberRecord | null>(null);
+useState<MemberRecord | null>(null);
 const [memberLoading, setMemberLoading] =
 useState(false);
 const [memberError, setMemberError] =
 useState("");
 
-const cardRef = useRef\<HTMLDivElement>(null);
-
-# /\*
+const cardRef = useRef<HTMLDivElement>(null);
+/*
 
 # LOAD TEMPLATE
 
-\*/
+*/
 
 useEffect(() => {
 async function loadTemplate() {
 setLoadingTemplate(true);
 
-```
   try {
     const { data, error } = await supabase
       .from("card_templates")
@@ -858,35 +852,30 @@ setLoadingTemplate(true);
 }
 
 loadTemplate();
-```
 
 }, []);
-
-# /\*
+/*
 
 # APPLY MEMBER DATA TO CURRENT CARD
 
-\*/
+*/
 
 useEffect(() => {
 if (!memberData) return;
 
-```
 setElements((current) =>
   applyMemberDataToElements(
     current,
     memberData
   )
 );
-```
 
 }, [memberData]);
-
-# /\*
+/*
 
 # LOAD MEMBER DETAILS
 
-\*/
+*/
 
 useEffect(() => {
 if (!memberId) {
@@ -895,7 +884,6 @@ setMemberError("Card URL ನಲ್ಲಿ member id ಇಲ್ಲ.");
 return;
 }
 
-```
 let cancelled = false;
 
 async function loadMember() {
@@ -975,15 +963,13 @@ loadMember();
 return () => {
   cancelled = true;
 };
-```
 
 }, [memberId]);
-
-# /\*
+/*
 
 # QR CODE
 
-\*/
+*/
 
 useEffect(() => {
 async function createQR() {
@@ -991,17 +977,16 @@ try {
 const membershipNumber = textValue(
 memberData,
 [
-"membership\_number",
-"membership\_no",
-"member\_number",
-"member\_no",
-"membership\_id",
-"card\_number",
+"membership_number",
+"membership_no",
+"member_number",
+"member_no",
+"membership_id",
+"card_number",
 ],
-memberId || "MEMBERSHIP\_NUMBER"
+memberId || "MEMBERSHIP_NUMBER"
 );
 
-```
     /*
      * QR must identify THIS member.
      * Send all common identifiers so the existing /verify page
@@ -1062,23 +1047,20 @@ memberId || "MEMBERSHIP\_NUMBER"
 }
 
 createQR();
-```
 
 }, [memberData, memberId]);
-
-# /\*
+/*
 
 # UPDATE ELEMENT
 
-\*/
+*/
 
 function updateElement(
 id: string,
-changes: Partial\<CardElement>
+changes: Partial<CardElement>
 ) {
 if (locked) return;
 
-```
 setElements((current) =>
   current.map((element) =>
     element.id === id
@@ -1089,20 +1071,17 @@ setElements((current) =>
       : element
   )
 );
-```
 
 }
-
-# /\*
+/*
 
 # DELETE ELEMENT
 
-\*/
+*/
 
 function deleteElement(id: string) {
 if (locked) return;
 
-```
 setElements((current) =>
   current.filter(
     (element) =>
@@ -1111,15 +1090,13 @@ setElements((current) =>
 );
 
 setSelectedId(null);
-```
 
 }
-
-# /\*
+/*
 
 # DRAG ELEMENT
 
-\*/
+*/
 
 function handlePointerDown(
 event: React.PointerEvent,
@@ -1127,7 +1104,6 @@ element: CardElement
 ) {
 if (locked) return;
 
-```
 event.preventDefault();
 event.stopPropagation();
 
@@ -1204,20 +1180,17 @@ window.addEventListener(
   "pointerup",
   up
 );
-```
 
 }
-
-# /\*
+/*
 
 # ADD TEXT
 
-\*/
+*/
 
 function addText() {
 if (locked) return;
 
-```
 const newElement: CardElement = {
   id: `text-${Date.now()}`,
   label: "New Text",
@@ -1242,22 +1215,19 @@ setElements((current) => [
 setSelectedId(
   newElement.id
 );
-```
 
 }
-
-# /\*
+/*
 
 # ADD IMAGE
 
-\*/
+*/
 
 async function addImage(
-event: React.ChangeEvent\<HTMLInputElement>
+event: React.ChangeEvent<HTMLInputElement>
 ) {
 if (locked) return;
 
-```
 const file =
   event.target.files?.[0];
 
@@ -1302,22 +1272,19 @@ try {
 }
 
 event.target.value = "";
-```
 
 }
-
-# /\*
+/*
 
 # MEMBER PHOTO
 
-\*/
+*/
 
 async function uploadMemberPhoto(
-event: React.ChangeEvent\<HTMLInputElement>
+event: React.ChangeEvent<HTMLInputElement>
 ) {
 if (locked) return;
 
-```
 const file =
   event.target.files?.[0];
 
@@ -1349,15 +1316,13 @@ try {
 }
 
 event.target.value = "";
-```
 
 }
-
-# /\*
+/*
 
 # SAVE TEMPLATE
 
-\*/
+*/
 
 async function saveTemplate() {
 if (locked) {
@@ -1365,7 +1330,6 @@ alert(
 "🔒 Template locked ಇದೆ. ಮೊದಲು Unlock ಮಾಡಿ."
 );
 
-```
   return;
 }
 
@@ -1433,20 +1397,17 @@ try {
 } finally {
   setSaving(false);
 }
-```
 
 }
-
-# /\*
+/*
 
 # LOCK TEMPLATE
 
-\*/
+*/
 
 async function lockTemplate() {
 if (saving) return;
 
-```
 if (!templateId) {
   alert(
     "ಮೊದಲು 💾 Save Template ಮಾಡಿ."
@@ -1517,20 +1478,17 @@ try {
 } finally {
   setSaving(false);
 }
-```
 
 }
-
-# /\*
+/*
 
 # UNLOCK TEMPLATE
 
-\*/
+*/
 
 async function unlockTemplate() {
 if (!templateId) return;
 
-```
 const ok = confirm(
   "🔓 Template Unlock ಮಾಡಬೇಕೇ?"
 );
@@ -1573,30 +1531,28 @@ try {
 } finally {
   setSaving(false);
 }
-```
 
 }
-
-# /\*
+/*
 
 # RESET
 
-\*/
+*/
 
-/\*
-\=========================================
+/*
+=========================================
 PRINT / SAVE AS PDF
-\=========================================
-\*/
+=========================================
+*/
 
 function escapePrintHtml(value: unknown): string {
-return String(value ?? "")
-.replace(/&/g, "&")
-.replace(/\</g, "<")
-.replace(/>/g, ">")
-.replace(/"/g, """)
-.replace(/'/g, "'")
-.replace(/\n/g, "\<br />");
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/\\n/g, "<br />");
 }
 
 function buildPrintCardHtml(printSide: Side): string {
@@ -1604,7 +1560,6 @@ const sideElements = elements.filter(
 (element) => element.side === printSide
 );
 
-```
 // The editor uses an 856 × 539 coordinate system.
 // For a CR80 card (85.6 × 53.9 mm), 1 editor px = 0.1 mm.
 const pxToMm = (value: number) => `${value / 10}mm`;
@@ -1686,14 +1641,12 @@ return `
     </div>
   </section>
 `;
-```
 
 }
 
 function printCard() {
 if (typeof window === "undefined" || typeof document === "undefined") return;
 
-```
 /*
  * PDF / Print output
  * -----------------
@@ -1737,14 +1690,12 @@ window.print();
 
 // Safety cleanup for browsers that do not fire afterprint.
 window.setTimeout(cleanup, 60000);
-```
 
 }
 
 function resetDesign() {
 if (locked) return;
 
-```
 const ok = confirm(
   "Current design reset ಮಾಡಬೇಕೇ?"
 );
@@ -1762,7 +1713,6 @@ setSelectedId(null);
 setSide("front");
 
 setMemberPhoto(null);
-```
 
 }
 
@@ -1777,23 +1727,21 @@ elements.find(
 (element) =>
 element.id === selectedId
 ) || null;
-
-# /\*
+/*
 
 # LOADING
 
-\*/
+*/
 
 if (loadingTemplate) {
 return (
-\<AdminGuard>
-\<main className="min-h-screen flex items-center justify-center bg-slate-100">
-\<div className="bg-white rounded-2xl shadow p-8 text-center">
-\<div className="text-3xl mb-3">
+<AdminGuard>
+<main className="min-h-screen flex items-center justify-center bg-slate-100">
+<div className="bg-white rounded-2xl shadow p-8 text-center">
+<div className="text-3xl mb-3">
 ⏳
-\</div>
+</div>
 
-```
         <div className="font-bold">
           Card Template Loading...
         </div>
@@ -1801,26 +1749,23 @@ return (
     </main>
   </AdminGuard>
 );
-```
 
 }
-
-# /\*
+/*
 
 # PAGE
 
-\*/
+*/
 
 return (
 <>
-\<style jsx global>{\`
+<style jsx global>{`
 @media print {
 @page {
 size: 85.6mm 53.9mm;
 margin: 0;
 }
 
-```
       html,
       body {
         margin: 0 !important;
@@ -2867,23 +2812,20 @@ margin: 0;
   </main>
   </AdminGuard>
 </>
-```
 
 );
 }
+/*
 
-# /\*
-
-\*/
+*/
 
 export default function NewCardDesignerPage() {
 return (
-\<Suspense
+<Suspense
 fallback={
-\<main className="min-h-screen flex items-center justify-center bg-slate-100">
-\<div className="bg-white rounded-2xl shadow p-8 text-center">
+<main className="min-h-screen flex items-center justify-center bg-slate-100">
+<div className="bg-white rounded-2xl shadow p-8 text-center">
 
-```
         <div className="text-3xl mb-3">
           ⏳
         </div>
@@ -2898,7 +2840,6 @@ fallback={
 >
   <NewCardDesignerPageContent />
 </Suspense>
-```
 
 );
 }
