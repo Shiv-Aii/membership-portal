@@ -139,13 +139,14 @@ function VerifyPageContent() {
 
       function isActiveApproved(row: any): boolean {
         if (!row) return false;
-        if (row.is_deleted === true) return false;
-        if (row.is_active === false) return false;
+
+        // Match the existing Admin > Members page:
+        // an application is verifiable when status is "approved".
         if (row.status !== undefined && row.status !== null) {
-          const status = String(row.status).toLowerCase();
-          return status === "approved" || status === "active";
+          return String(row.status).toLowerCase() === "approved";
         }
-        return true;
+
+        return false;
       }
 
       // QR scan: first use the exact ID encoded in the QR.
