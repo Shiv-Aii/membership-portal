@@ -975,48 +975,20 @@ function NewCardDesignerPageContent() {
   useEffect(() => {
     async function createQR() {
       try {
-        const membershipNumber = textValue(
-          memberData,
-          [
-            "membership_number",
-            "membership_no",
-            "member_number",
-            "member_no",
-            "membership_id",
-            "card_number",
-          ],
-          memberId || "MEMBERSHIP_NUMBER"
-        );
-
         /*
-         * QR must identify THIS member.
-         * Send all common identifiers so the existing /verify page
-         * can use whichever parameter it already reads.
+         * IMPORTANT:
+         * QR uses ONLY this member's unique database ID.
+         * Membership Number is NOT written into the QR.
          */
-        if (!memberId && !membershipNumber) {
+        if (!memberId) {
           setQrImage("");
           return;
         }
 
-        const params = new URLSearchParams();
-
-        if (memberId) {
-          params.set("id", memberId);
-          params.set("member_id", memberId);
-          params.set("application_id", memberId);
-        }
-
-        if (
-          membershipNumber &&
-          membershipNumber !== "MEMBERSHIP_NUMBER"
-        ) {
-          params.set("membership", membershipNumber);
-        }
-
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?${params.toString()}`
-            : `/verify?${params.toString()}`;
+            ? `${window.location.origin}/verify?id=${encodeURIComponent(memberId)}`
+            : `/verify?id=${encodeURIComponent(memberId)}`;
 
         const image =
           await QRCode.toDataURL(
@@ -1042,7 +1014,7 @@ function NewCardDesignerPageContent() {
     }
 
     createQR();
-  }, [memberData, memberId]);
+  }, [memberId]);
 
   /*
   =========================================
