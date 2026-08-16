@@ -977,13 +977,8 @@ function NewCardDesignerPageContent() {
           memberData,
           [
             "membership_no",
-            "membership_number",
-            "member_number",
-            "member_no",
-            "membership_id",
-            "card_number",
           ],
-          memberId || "MEMBERSHIP_NUMBER"
+          ""
         );
 
         /*
