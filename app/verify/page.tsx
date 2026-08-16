@@ -67,6 +67,7 @@ function VerifyPageContent() {
 
   useEffect(() => {
     const qrNumber =
+      searchParams.get("membership_number") ||
       searchParams.get("membership") ||
       searchParams.get("membership_no") ||
       searchParams.get("number") ||
