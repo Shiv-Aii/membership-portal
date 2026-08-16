@@ -73,12 +73,17 @@ function VerifyPageContent() {
       searchParams.get("number") ||
       searchParams.get("member");
 
-    if (qrNumber) {
-      setNumber(qrNumber);
+    const qrMemberId =
+      searchParams.get("id") ||
+      searchParams.get("member_id") ||
+      searchParams.get("application_id");
 
-      // QR scan ಆದಾಗ number ಮಾತ್ರ fill ಆಗಬಾರದು.
-      // Direct verification ಕೂಡ automatically ಆಗಬೇಕು.
-      verifyMember(qrNumber);
+    if (qrNumber || qrMemberId) {
+      const value = qrNumber || "";
+      setNumber(value);
+
+      // QR scan ಆದಾಗ number/member id ಮೂಲಕ direct verification.
+      verifyMember(value, qrMemberId || undefined);
     }
   }, [searchParams]);
 
@@ -86,7 +91,10 @@ function VerifyPageContent() {
      VERIFY MEMBER
   =================================================== */
 
-  async function verifyMember(inputNumber?: string) {
+  async function verifyMember(
+    inputNumber?: string,
+    inputMemberId?: string
+  ) {
     const cleanNumber =
       (inputNumber ?? number).trim();
 
@@ -113,16 +121,38 @@ function VerifyPageContent() {
        * No new RPC/function is required.
        */
 
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("membership_no", cleanNumber)
-        .eq("status", "approved")
-        .eq("is_deleted", false)
-        .maybeSingle();
+      let data: any = null;
+      let error: any = null;
+
+      // QR code carries the original application/member id.
+      // Use that first so the QR always identifies the exact card member.
+      if (inputMemberId) {
+        const result = await supabase
+          .from("applications")
+          .select("*")
+          .eq("id", inputMemberId)
+          .eq("status", "approved")
+          .eq("is_deleted", false)
+          .maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
+
+      // If id was not present or did not find the member,
+      // fall back to the membership number verification.
+      if (!data && !error && cleanNumber) {
+        const result = await supabase
+          .from("applications")
+          .select("*")
+          .eq("membership_no", cleanNumber)
+          .eq("status", "approved")
+          .eq("is_deleted", false)
+          .maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
 
       console.log(
         "VERIFY RESULT:",
