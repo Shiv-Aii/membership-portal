@@ -101,32 +101,73 @@ function VerifyPageContent() {
       let found: any = null;
       let lastError: any = null;
 
-      const tables = [
-        "applications",
-        "members",
-        "membership_applications",
-        "member_applications",
-        "member_profiles",
-      ];
+      /*
+       * IMPORTANT:
+       * QR verification uses the UNIQUE ID contained in the QR.
+       * It does NOT use membership_no.
+       *
+       * The QR may contain one of these query parameters:
+       *   ?id=<unique id>
+       *   ?member_id=<unique member id>
+       *   ?application_id=<application id>
+       *
+       * Each parameter is checked against its matching column.
+       */
+      const qrParam =
+        searchParams.get("id")
+          ? "id"
+          : searchParams.get("member_id")
+          ? "member_id"
+          : searchParams.get("application_id")
+          ? "application_id"
+          : null;
+
+      const qrColumn =
+        qrParam === "member_id"
+          ? "member_id"
+          : "id";
+
+      const tables =
+        qrParam === "application_id"
+          ? ["applications"]
+          : qrParam === "member_id"
+          ? [
+              "applications",
+              "members",
+              "membership_applications",
+              "member_applications",
+              "member_profiles",
+            ]
+          : [
+              "applications",
+              "members",
+              "membership_applications",
+              "member_applications",
+              "member_profiles",
+            ];
 
       function isApproved(row: any): boolean {
         if (!row) return false;
 
-        if (row.status !== undefined && row.status !== null) {
-          return String(row.status).toLowerCase() === "approved";
+        if (
+          row.status !== undefined &&
+          row.status !== null
+        ) {
+          return (
+            String(row.status).toLowerCase() ===
+            "approved"
+          );
         }
 
         return false;
       }
 
-      // QR verification:
-      // The unique ID inside the QR is the ONLY identifier used.
       for (const table of tables) {
         try {
           const { data, error } = await supabase
             .from(table)
             .select("*")
-            .eq("id", cleanId)
+            .eq(qrColumn, cleanId)
             .maybeSingle();
 
           if (error) {
@@ -143,7 +184,11 @@ function VerifyPageContent() {
         }
       }
 
-      console.log("QR VERIFY ID:", cleanId);
+      console.log("QR VERIFY:", {
+        parameter: qrParam,
+        column: qrColumn,
+        value: cleanId,
+      });
       console.log("VERIFY RESULT:", found);
       console.log("VERIFY ERROR:", lastError);
 
@@ -159,7 +204,7 @@ function VerifyPageContent() {
       console.error("QR VERIFY ERROR:", error);
 
       alert(
-        "QR Verification failed\n\n" +
+        "QR Verification failed\\n\\n" +
           (error?.message || "Unknown error")
       );
     } finally {
