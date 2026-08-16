@@ -112,7 +112,6 @@ function VerifyPageContent() {
         .from("applications")
         .select("*")
         .eq("id", cleanId)
-        .eq("status", "approved")
         .maybeSingle();
 
       if (error) {
@@ -121,10 +120,22 @@ function VerifyPageContent() {
       }
 
       /*
-       * Recycle-bin members must not verify.
-       * is_deleted can be false OR NULL for active records.
+       * The QR is identified ONLY by applications.id.
+       * Do not use membership_no for this lookup.
+       *
+       * Status is checked after the row is found so that
+       * "approved", "Approved", etc. are treated the same.
+       * is_deleted = NULL is allowed; only true is deleted.
        */
-      if (!data || data.is_deleted === true) {
+      const approved =
+        data &&
+        String(data.status ?? "").trim().toLowerCase() === "approved";
+
+      if (
+        !data ||
+        data.is_deleted === true ||
+        !approved
+      ) {
         setMember(null);
         setVerifiedAt(null);
         return;
