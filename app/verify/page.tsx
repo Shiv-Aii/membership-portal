@@ -84,7 +84,7 @@ function VerifyPageContent() {
 
       // QR scan ಆದಾಗ ಅದೇ member/application ID ಮೂಲಕ
       // direct verification ಆಗಬೇಕು.
-      verifyMember(qrNumber, qrId);
+      verifyMember(qrNumber ?? undefined, qrId ?? undefined);
     }
   }, [searchParams]);
 
