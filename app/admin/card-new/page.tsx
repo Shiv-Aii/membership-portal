@@ -972,59 +972,39 @@ return () => {
 */
 
 useEffect(() => {
-async function createQR() {
-try {
-const membershipNumber = textValue(
-memberData,
-[
-"membership_number",
-"membership_no",
-"member_number",
-"member_no",
-"membership_id",
-"card_number",
-],
-memberId || "MEMBERSHIP_NUMBER"
-);
+  async function createQR() {
+    try {
+      const membershipNumber = textValue(
+        memberData,
+        [
+          "membership_no",
+          "membership_number",
+          "member_number",
+          "member_no",
+          "membership_id",
+          "card_number",
+        ],
+        ""
+      ).trim();
 
-    /*
-     * QR must identify THIS member.
-     * Send all common identifiers so the existing /verify page
-     * can use whichever parameter it already reads.
-     */
-    if (!memberId && !membershipNumber) {
-      setQrImage("");
-      return;
-    }
+      if (!membershipNumber) {
+        setQrImage("");
+        return;
+      }
 
-    const params = new URLSearchParams();
+      const params = new URLSearchParams();
 
-    // Keep the exact member/application id in the QR.
-    // Verification can therefore identify the same member record
-    // that was used to create this card.
-    if (memberId) {
-      params.set("id", memberId);
-      params.set("member_id", memberId);
-      params.set("application_id", memberId);
-    }
+      // IMPORTANT:
+      // Verify page databaseನಲ್ಲಿ applications.membership_no
+      // ಮೂಲಕ member ಹುಡುಕುತ್ತದೆ.
+      params.set("membership_no", membershipNumber);
 
-    if (
-      membershipNumber &&
-      membershipNumber !== "MEMBERSHIP_NUMBER"
-    ) {
-      params.set(
-        "membership_number",
-        membershipNumber
-      );
-    }
+      const url =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/verify?${params.toString()}`
+          : `/verify?${params.toString()}`;
 
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/verify?${params.toString()}`
-        : `/verify?${params.toString()}`;
-
-    const image =
-      await QRCode.toDataURL(
+      const image = await QRCode.toDataURL(
         url,
         {
           width: 500,
@@ -1037,18 +1017,18 @@ memberId || "MEMBERSHIP_NUMBER"
         }
       );
 
-    setQrImage(image);
-  } catch (error) {
-    console.error(
-      "QR generation error:",
-      error
-    );
+      setQrImage(image);
+    } catch (error) {
+      console.error(
+        "QR generation error:",
+        error
+      );
+      setQrImage("");
+    }
   }
-}
 
-createQR();
-
-}, [memberData, memberId]);
+  createQR();
+}, [memberData]);
 /*
 
 # UPDATE ELEMENT
