@@ -33,14 +33,6 @@ type Member = {
 
   is_active?: boolean;
 
-  valid_till?: string | number | null;
-  valid_till_date?: string | number | null;
-  valid_until?: string | number | null;
-  expiry_date?: string | number | null;
-  membership_expiry?: string | number | null;
-  expires_at?: string | number | null;
-  end_date?: string | number | null;
-
   title?: string;
   description?: string;
 };
@@ -66,9 +58,6 @@ function VerifyPageContent() {
   const [verifiedAt, setVerifiedAt] =
     useState<Date | null>(null);
 
-  const [notValid, setNotValid] =
-    useState(false);
-
   /* ===================================================
      GET MEMBERSHIP NUMBER FROM QR URL
      
@@ -84,12 +73,11 @@ function VerifyPageContent() {
       searchParams.get("member");
 
     if (qrNumber) {
-      const cleanQrNumber = qrNumber.trim();
+      setNumber(qrNumber);
 
-      setNumber(cleanQrNumber);
-
-      // QR scan ಆದಾಗ automatic verification.
-      verifyMember(cleanQrNumber);
+      // QR scan ಆದಾಗ number ಮಾತ್ರ fill ಆಗಬಾರದು.
+      // Direct verification ಕೂಡ automatically ಆಗಬೇಕು.
+      verifyMember(qrNumber);
     }
   }, [searchParams]);
 
@@ -114,7 +102,6 @@ function VerifyPageContent() {
 
     setMember(null);
     setVerifiedAt(null);
-    setNotValid(false);
 
     try {
       /*
@@ -132,6 +119,8 @@ function VerifyPageContent() {
         .from("applications")
         .select("*")
         .eq("membership_no", cleanNumber)
+        .eq("status", "approved")
+        .eq("is_deleted", false)
         .maybeSingle();
 
       console.log(
@@ -167,106 +156,14 @@ function VerifyPageContent() {
       if (!result) {
         setMember(null);
         setVerifiedAt(null);
-        setNotValid(false);
 
         return;
       }
 
       /*
-       * Existing approval/deleted rules.
+       * Member ಸಿಕ್ಕಿದೆ
        */
-      const isApproved =
-        String(result.status ?? "")
-          .trim()
-          .toLowerCase() === "approved";
 
-      const isDeleted =
-        result.is_deleted === true;
-
-      if (!isApproved || isDeleted) {
-        setMember(null);
-        setVerifiedAt(null);
-        setNotValid(false);
-
-        return;
-      }
-
-      /*
-       * Existing card code uses these expiry fields:
-       * valid_till, valid_till_date, valid_until,
-       * expiry_date, membership_expiry, expires_at, end_date.
-       */
-      const expiryValue =
-        result.valid_till ??
-        result.valid_till_date ??
-        result.valid_until ??
-        result.expiry_date ??
-        result.membership_expiry ??
-        result.expires_at ??
-        result.end_date ??
-        null;
-
-      if (expiryValue) {
-        const rawExpiry =
-          String(expiryValue).trim();
-
-        let expiryDate: Date | null = null;
-
-        /*
-         * DD-MM-YYYY / DD/MM/YYYY
-         */
-        const ddmmyyyy =
-          rawExpiry.match(
-            /^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/
-          );
-
-        if (ddmmyyyy) {
-          const day = Number(ddmmyyyy[1]);
-          const month = Number(ddmmyyyy[2]);
-          const year = Number(ddmmyyyy[3]);
-
-          expiryDate = new Date(
-            year,
-            month - 1,
-            day,
-            23,
-            59,
-            59,
-            999
-          );
-        } else {
-          const parsed = new Date(rawExpiry);
-
-          if (!Number.isNaN(parsed.getTime())) {
-            expiryDate = parsed;
-            expiryDate.setHours(
-              23,
-              59,
-              59,
-              999
-            );
-          }
-        }
-
-        /*
-         * Expiry ಮುಗಿದಿದ್ದರೆ NOT VALID.
-         */
-        if (
-          expiryDate &&
-          new Date().getTime() >
-            expiryDate.getTime()
-        ) {
-          setMember(null);
-          setVerifiedAt(null);
-          setNotValid(true);
-
-          return;
-        }
-      }
-
-      /*
-       * Valid member.
-       */
       setMember(
         result as Member
       );
@@ -877,9 +774,7 @@ function VerifyPageContent() {
               text-slate-900
               mt-6
             ">
-              {notValid
-                ? "NOT VALID"
-                : "Member Not Found"}
+              Member Not Found
             </h2>
 
             <p className="
@@ -887,9 +782,9 @@ function VerifyPageContent() {
               text-lg
               mt-4
             ">
-              {notValid
-                ? "ಈ Membership Card ನ validity ಮುಗಿದಿದೆ."
-                : "ಈ Membership Numberಗೆ approved active member ಸಿಗಲಿಲ್ಲ."}
+              ಈ Membership Numberಗೆ
+              approved active member
+              ಸಿಗಲಿಲ್ಲ.
             </p>
 
             <p className="
