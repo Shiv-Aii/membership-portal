@@ -193,12 +193,6 @@ function applyMemberDataToElements(
     "ಆಧಾರ್ / Aadhaar Number"
   );
 
-  const vehicleNumber = textValue(
-    member,
-    ["vehicle_number"],
-    ""
-  );
-
   const validFrom = dateValue(
     member,
     [
@@ -229,28 +223,21 @@ function applyMemberDataToElements(
   return current.map((element) => {
     switch (element.id) {
       case "name":
-        return { ...element, text: `ಹೆಸರು : ${name}` };
+        return { ...element, text: `ಹೆಸರು / Name: ${name}` };
       case "membership":
         return { ...element, text: `Membership No: ${membership}` };
       case "designation":
-        return { ...element, text: `ಹುದ್ದೆ  : ${designation}` };
+        return { ...element, text: `ಹುದ್ದೆ / Designation: ${designation}` };
       case "village":
-        return { ...element, text: `ಗ್ರಾಮ  : ${village}` };
+        return { ...element, text: `ಗ್ರಾಮ / Village: ${village}` };
       case "taluk":
-        return { ...element, text: `ತಾಲ್ಲೂಕು : ${taluk}` };
+        return { ...element, text: `ತಾಲ್ಲೂಕು / Taluk: ${taluk}` };
       case "district":
-        return { ...element, text: `ಜಿಲ್ಲೆ : ${district}` };
+        return { ...element, text: `ಜಿಲ್ಲೆ / District: ${district}` };
       case "mobile":
-        return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
+        return { ...element, text: `ಮೊಬೈಲ್ / Mobile: ${mobile}` };
       case "aadhaar":
-        return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
-      case "vehicle-number":
-        return {
-          ...element,
-          text: vehicleNumber
-            ? `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}`
-            : "",
-        };
+        return { ...element, text: `ಆಧಾರ್ / Aadhaar: ${aadhaar}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -441,22 +428,6 @@ const initialElements: CardElement[] = [
   },
 
   {
-    id: "vehicle-number",
-    label: "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number",
-    kind: "text",
-    text: "",
-    side: "front",
-    x: 255,
-    y: 431,
-    width: 365,
-    height: 30,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111111",
-    background: "transparent",
-  },
-
-  {
     id: "front-photo-label",
     label: "ಫೋಟೋ / Photo",
     kind: "text",
@@ -504,6 +475,38 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
     borderRadius: 12,
+  },
+
+  {
+    id: "valid-from",
+    label: "Valid From",
+    kind: "text",
+    text: "VALID FROM: 13-08-2026",
+    side: "front",
+    x: 300,
+    y: 415,
+    width: 250,
+    height: 35,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#075c2b",
+    background: "#ffffff",
+  },
+
+  {
+    id: "valid-till",
+    label: "Valid Till",
+    kind: "text",
+    text: "VALID TILL: 12-08-2027",
+    side: "front",
+    x: 560,
+    y: 415,
+    width: 250,
+    height: 35,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#075c2b",
+    background: "#ffffff",
   },
 
   {
@@ -661,7 +664,6 @@ const MEMBER_DATA_ELEMENT_IDS = new Set([
   "district",
   "mobile",
   "aadhaar",
-  "vehicle-number",
   "valid-from",
   "valid-till",
   "back-valid-from",
