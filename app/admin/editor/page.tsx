@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  ChangeEvent,
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +24,35 @@ type ProcessItem = {
   description: string;
 };
 
+type TextStyle = {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  fontStyle: "normal" | "italic";
+  textDecoration: "none" | "underline";
+  textAlign: "left" | "center" | "right";
+  color: string;
+  backgroundColor: string;
+  lineHeight: number;
+  letterSpacing: number;
+  opacity: number;
+  borderRadius: number;
+};
+
+type PageElement = {
+  id: string;
+  type: "text" | "image";
+  content: string;
+  image_url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+  style: TextStyle;
+  objectFit: "cover" | "contain" | "fill";
+};
+
 type PageContent = {
   hero: {
     badge: string;
@@ -26,16 +62,36 @@ type PageContent = {
     image_url: string;
     image_alt: string;
   };
+
   news: NewsItem[];
+
   process: {
     title: string;
     description: string;
     items: ProcessItem[];
   };
+
   cta: {
     title: string;
     description: string;
   };
+
+  elements: PageElement[];
+};
+
+const defaultTextStyle: TextStyle = {
+  fontFamily: "Arial, sans-serif",
+  fontSize: 24,
+  fontWeight: 600,
+  fontStyle: "normal",
+  textDecoration: "none",
+  textAlign: "left",
+  color: "#111827",
+  backgroundColor: "transparent",
+  lineHeight: 1.4,
+  letterSpacing: 0,
+  opacity: 1,
+  borderRadius: 0,
 };
 
 const defaultContent: PageContent = {
@@ -43,9 +99,11 @@ const defaultContent: PageContent = {
     badge: "🚜 ರೈತರು • ಕೃಷಿ • ಸಂಘಟನೆ",
     eyebrow: "Organization Membership Portal",
     title: "ನಮ್ಮ ಸಂಘಟನೆಗೆ ಸದಸ್ಯರಾಗಿ",
-    description: "ಸದಸ್ಯತ್ವ ನೋಂದಣಿ ಮಾಡಿ ಮತ್ತು PVC ID Card ಪಡೆಯಿರಿ",
+    description:
+      "ಸದಸ್ಯತ್ವ ನೋಂದಣಿ ಮಾಡಿ ಮತ್ತು PVC ID Card ಪಡೆಯಿರಿ",
     image_url: "",
-    image_alt: "ರೈತರು ಕೃಷಿ ಕೆಲಸ ಮಾಡುತ್ತಿರುವ ದೃಶ್ಯ",
+    image_alt:
+      "ರೈತರು ಕೃಷಿ ಕೆಲಸ ಮಾಡುತ್ತಿರುವ ದೃಶ್ಯ",
   },
 
   news: [
@@ -103,10 +161,21 @@ const defaultContent: PageContent = {
     description:
       "ನಿಮ್ಮ ವಿವರ ಸಲ್ಲಿಸಿ ಮತ್ತು Admin approval ಪಡೆಯಿರಿ.",
   },
+
+  elements: [],
 };
+
+function createId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 9)}`;
+}
 
 export default function Editor() {
   const router = useRouter();
+
+  const previewRef =
+    useRef<HTMLDivElement | null>(null);
 
   const [content, setContent] =
     useState<PageContent>(defaultContent);
@@ -122,6 +191,32 @@ export default function Editor() {
 
   const [message, setMessage] =
     useState("");
+
+  const [selectedElementId, setSelectedElementId] =
+    useState<string | null>(null);
+
+  const [cropSource, setCropSource] =
+    useState<string | null>(null);
+
+  const [cropTarget, setCropTarget] =
+    useState<
+      | { type: "hero" }
+      | { type: "news"; index: number }
+      | { type: "element"; id: string }
+      | null
+    >(null);
+
+  const [cropX, setCropX] =
+    useState(50);
+
+  const [cropY, setCropY] =
+    useState(50);
+
+  const [cropZoom, setCropZoom] =
+    useState(1);
+
+  const [cropBusy, setCropBusy] =
+    useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -153,36 +248,50 @@ export default function Editor() {
         );
 
         if (settings.page_content) {
+          const saved =
+            settings.page_content as Partial<PageContent>;
+
           setContent({
             ...defaultContent,
-            ...settings.page_content,
+            ...saved,
+
             hero: {
               ...defaultContent.hero,
-              ...settings.page_content.hero,
+              ...(saved.hero || {}),
             },
+
             news:
-              settings.page_content.news ||
+              saved.news ||
               defaultContent.news,
+
             process: {
               ...defaultContent.process,
-              ...settings.page_content.process,
+              ...(saved.process || {}),
               items:
-                settings.page_content.process?.items ||
+                saved.process?.items ||
                 defaultContent.process.items,
             },
+
             cta: {
               ...defaultContent.cta,
-              ...settings.page_content.cta,
+              ...(saved.cta || {}),
             },
+
+            elements:
+              saved.elements ||
+              [],
           });
         } else {
           setContent({
             ...defaultContent,
+
             hero: {
               ...defaultContent.hero,
+
               title:
                 settings.hero_text ||
                 defaultContent.hero.title,
+
               description:
                 settings.sub_text ||
                 defaultContent.hero.description,
@@ -203,6 +312,7 @@ export default function Editor() {
   ) {
     setContent((prev) => ({
       ...prev,
+
       hero: {
         ...prev.hero,
         [key]: value,
@@ -236,7 +346,9 @@ export default function Editor() {
     value: string
   ) {
     setContent((prev) => {
-      const items = [...prev.process.items];
+      const items = [
+        ...prev.process.items,
+      ];
 
       items[index] = {
         ...items[index],
@@ -245,6 +357,7 @@ export default function Editor() {
 
       return {
         ...prev,
+
         process: {
           ...prev.process,
           items,
@@ -259,6 +372,7 @@ export default function Editor() {
   ) {
     setContent((prev) => ({
       ...prev,
+
       process: {
         ...prev.process,
         [key]: value,
@@ -272,6 +386,7 @@ export default function Editor() {
   ) {
     setContent((prev) => ({
       ...prev,
+
       cta: {
         ...prev.cta,
         [key]: value,
@@ -279,73 +394,453 @@ export default function Editor() {
     }));
   }
 
-  async function uploadImage(
-    file: File,
-    target:
-      | {
-          type: "hero";
-        }
-      | {
-          type: "news";
-          index: number;
-        }
+  function updateElement(
+    id: string,
+    patch: Partial<PageElement>
   ) {
-    if (!file) return;
+    setContent((prev) => ({
+      ...prev,
 
-    setMessage("Image uploading...");
+      elements: prev.elements.map(
+        (element) =>
+          element.id === id
+            ? {
+                ...element,
+                ...patch,
+              }
+            : element
+      ),
+    }));
+  }
 
-    const extension =
-      file.name.split(".").pop() ||
-      "jpg";
+  function updateElementStyle(
+    id: string,
+    patch: Partial<TextStyle>
+  ) {
+    setContent((prev) => ({
+      ...prev,
 
-    const filename =
-      `${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2)}.${extension}`;
+      elements: prev.elements.map(
+        (element) =>
+          element.id === id
+            ? {
+                ...element,
+                style: {
+                  ...element.style,
+                  ...patch,
+                },
+              }
+            : element
+      ),
+    }));
+  }
 
-    const path =
-      `main-page/${filename}`;
+  function addTextElement() {
+    const element: PageElement = {
+      id: createId("text"),
+      type: "text",
+      content: "ಹೊಸ Text ಇಲ್ಲಿ ಬರೆಯಿರಿ",
+      image_url: "",
+      x: 100,
+      y: 500,
+      width: 350,
+      height: 100,
+      zIndex: 100,
+      style: {
+        ...defaultTextStyle,
+      },
+      objectFit: "contain",
+    };
 
-    const { error } =
-      await supabase.storage
-        .from("site-images")
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+    setContent((prev) => ({
+      ...prev,
 
-    if (error) {
-      console.error(error);
+      elements: [
+        ...prev.elements,
+        element,
+      ],
+    }));
 
-      setMessage(
-        "❌ Image upload ಆಗಲಿಲ್ಲ: " +
-          error.message
+    setSelectedElementId(
+      element.id
+    );
+  }
+
+  function addImageElement() {
+    const element: PageElement = {
+      id: createId("image"),
+      type: "image",
+      content: "",
+      image_url: "",
+      x: 100,
+      y: 650,
+      width: 360,
+      height: 220,
+      zIndex: 100,
+      style: {
+        ...defaultTextStyle,
+      },
+      objectFit: "cover",
+    };
+
+    setContent((prev) => ({
+      ...prev,
+
+      elements: [
+        ...prev.elements,
+        element,
+      ],
+    }));
+
+    setSelectedElementId(
+      element.id
+    );
+  }
+
+  function deleteElement(id: string) {
+    setContent((prev) => ({
+      ...prev,
+
+      elements:
+        prev.elements.filter(
+          (element) =>
+            element.id !== id
+        ),
+    }));
+
+    setSelectedElementId(null);
+  }
+
+  function moveElement(
+    id: string,
+    event: ReactPointerEvent<HTMLDivElement>
+  ) {
+    const preview =
+      previewRef.current;
+
+    if (!preview) return;
+
+    const element =
+      content.elements.find(
+        (item) => item.id === id
       );
 
+    if (!element) return;
+
+    const startX =
+      event.clientX;
+
+    const startY =
+      event.clientY;
+
+    const originalX =
+      element.x;
+
+    const originalY =
+      element.y;
+
+    function move(
+      e: globalThis.PointerEvent
+    ) {
+      const nextX =
+        originalX +
+        (e.clientX - startX);
+
+      const nextY =
+        originalY +
+        (e.clientY - startY);
+
+      updateElement(id, {
+        x: Math.max(
+          0,
+          nextX
+        ),
+
+        y: Math.max(
+          0,
+          nextY
+        ),
+      });
+    }
+
+    function stop() {
+      window.removeEventListener(
+        "pointermove",
+        move
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        stop
+      );
+    }
+
+    window.addEventListener(
+      "pointermove",
+      move
+    );
+
+    window.addEventListener(
+      "pointerup",
+      stop
+    );
+  }
+
+  function startCrop(
+    file: File,
+    target:
+      | { type: "hero" }
+      | { type: "news"; index: number }
+      | { type: "element"; id: string }
+  ) {
+    const reader =
+      new FileReader();
+
+    reader.onload = () => {
+      setCropSource(
+        String(reader.result)
+      );
+
+      setCropTarget(target);
+
+      setCropX(50);
+      setCropY(50);
+      setCropZoom(1);
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  async function cropAndUpload() {
+    if (
+      !cropSource ||
+      !cropTarget
+    ) {
       return;
     }
 
-    const { data } =
-      supabase.storage
-        .from("site-images")
-        .getPublicUrl(path);
+    setCropBusy(true);
 
-    if (target.type === "hero") {
-      updateHero(
-        "image_url",
-        data.publicUrl
+    try {
+      const image =
+        new Image();
+
+      image.src =
+        cropSource;
+
+      await new Promise<void>(
+        (resolve, reject) => {
+          image.onload = () =>
+            resolve();
+
+          image.onerror = () =>
+            reject(
+              new Error(
+                "Image load failed"
+              )
+            );
+        }
       );
-    }
 
-    if (target.type === "news") {
-      updateNews(
-        target.index,
-        "image_url",
-        data.publicUrl
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      const outputWidth =
+        1200;
+
+      const outputHeight =
+        800;
+
+      canvas.width =
+        outputWidth;
+
+      canvas.height =
+        outputHeight;
+
+      const ctx =
+        canvas.getContext("2d");
+
+      if (!ctx) {
+        throw new Error(
+          "Canvas unavailable"
+        );
+      }
+
+      const targetRatio =
+        outputWidth /
+        outputHeight;
+
+      const sourceRatio =
+        image.width /
+        image.height;
+
+      let cropWidth =
+        image.width;
+
+      let cropHeight =
+        image.height;
+
+      if (
+        sourceRatio >
+        targetRatio
+      ) {
+        cropWidth =
+          image.height *
+          targetRatio;
+      } else {
+        cropHeight =
+          image.width /
+          targetRatio;
+      }
+
+      cropWidth /=
+        cropZoom;
+
+      cropHeight /=
+        cropZoom;
+
+      const maxX =
+        image.width -
+        cropWidth;
+
+      const maxY =
+        image.height -
+        cropHeight;
+
+      const sourceX =
+        Math.max(
+          0,
+          Math.min(
+            maxX,
+            (maxX * cropX) /
+              100
+          )
+        );
+
+      const sourceY =
+        Math.max(
+          0,
+          Math.min(
+            maxY,
+            (maxY * cropY) /
+              100
+          )
+        );
+
+      ctx.drawImage(
+        image,
+        sourceX,
+        sourceY,
+        cropWidth,
+        cropHeight,
+        0,
+        0,
+        outputWidth,
+        outputHeight
       );
-    }
 
-    setMessage("✅ Image uploaded.");
+      const blob =
+        await new Promise<Blob | null>(
+          (resolve) =>
+            canvas.toBlob(
+              resolve,
+              "image/jpeg",
+              0.9
+            )
+        );
+
+      if (!blob) {
+        throw new Error(
+          "Crop failed"
+        );
+      }
+
+      const filename =
+        `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.jpg`;
+
+      const path =
+        `main-page/${filename}`;
+
+      const { error } =
+        await supabase.storage
+          .from("site-images")
+          .upload(
+            path,
+            blob,
+            {
+              cacheControl:
+                "3600",
+              upsert: false,
+              contentType:
+                "image/jpeg",
+            }
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      const { data } =
+        supabase.storage
+          .from("site-images")
+          .getPublicUrl(path);
+
+      const imageUrl =
+        data.publicUrl;
+
+      if (
+        cropTarget.type ===
+        "hero"
+      ) {
+        updateHero(
+          "image_url",
+          imageUrl
+        );
+      }
+
+      if (
+        cropTarget.type ===
+        "news"
+      ) {
+        updateNews(
+          cropTarget.index,
+          "image_url",
+          imageUrl
+        );
+      }
+
+      if (
+        cropTarget.type ===
+        "element"
+      ) {
+        updateElement(
+          cropTarget.id,
+          {
+            image_url:
+              imageUrl,
+          }
+        );
+      }
+
+      setCropSource(null);
+      setCropTarget(null);
+
+      setMessage(
+        "✅ Image crop ಮಾಡಿ previewಗೆ ಸೇರಿಸಲಾಗಿದೆ."
+      );
+    } catch (error) {
+      console.error(error);
+
+      setMessage(
+        "❌ Image crop/upload ಆಗಲಿಲ್ಲ."
+      );
+    } finally {
+      setCropBusy(false);
+    }
   }
 
   async function save() {
@@ -358,10 +853,6 @@ export default function Editor() {
         .upsert({
           id: 1,
 
-          /*
-           * Existing fields are also kept
-           * synchronized.
-           */
           hero_text:
             content.hero.title,
 
@@ -392,8 +883,15 @@ export default function Editor() {
   }
 
   function reset() {
-    setContent(defaultContent);
+    setContent(
+      defaultContent
+    );
+
     setBrand("#16a34a");
+
+    setSelectedElementId(
+      null
+    );
 
     setMessage(
       "Reset preview ಮಾತ್ರ ಮಾಡಲಾಗಿದೆ. Save ಒತ್ತಿದರೆ database update ಆಗುತ್ತದೆ."
@@ -410,20 +908,29 @@ export default function Editor() {
     );
   }
 
+  const selectedElement =
+    content.elements.find(
+      (element) =>
+        element.id ===
+        selectedElementId
+    ) || null;
+
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className="h-screen overflow-hidden bg-slate-100">
 
-      <header className="bg-slate-950 text-white sticky top-0 z-50">
+      {/* HEADER */}
 
-        <div className="max-w-7xl mx-auto px-5 py-5 flex flex-wrap gap-4 justify-between items-center">
+      <header className="h-[76px] bg-slate-950 text-white">
+
+        <div className="h-full px-5 flex items-center justify-between">
 
           <div>
             <h1 className="text-2xl font-bold">
               Visual Website Editor
             </h1>
 
-            <p className="text-sm text-slate-400 mt-1">
-              Main Page ಸಂಪೂರ್ಣ Content Editor
+            <p className="text-sm text-slate-400">
+              Main Page Design Editor
             </p>
           </div>
 
@@ -452,567 +959,981 @@ export default function Editor() {
 
       </header>
 
-      <div className="max-w-7xl mx-auto p-5">
 
-        {message && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 mb-5 font-semibold">
-            {message}
-          </div>
-        )}
+      {/* EDITOR + PREVIEW */}
 
-        <div className="grid xl:grid-cols-2 gap-6">
+      <div className="h-[calc(100vh-76px)] grid lg:grid-cols-[430px_minmax(0,1fr)]">
 
-          {/* HERO EDITOR */}
+        {/* EDIT SECTION */}
 
-          <section className="bg-white rounded-3xl shadow-sm p-6">
+        <aside className="h-full overflow-y-auto bg-white border-r border-slate-200">
 
-            <h2 className="text-xl font-bold">
-              🚜 Hero Section
-            </h2>
+          <div className="p-5 space-y-5">
 
-            <div className="space-y-4 mt-5">
+            {message && (
+              <div className="bg-slate-50 border rounded-xl p-4 text-sm font-semibold">
+                {message}
+              </div>
+            )}
 
-              <input
-                value={content.hero.badge}
-                onChange={(e) =>
-                  updateHero(
-                    "badge",
-                    e.target.value
-                  )
-                }
-                className="w-full border rounded-xl p-3"
-                placeholder="Badge"
-              />
 
-              <input
-                value={content.hero.eyebrow}
-                onChange={(e) =>
-                  updateHero(
-                    "eyebrow",
-                    e.target.value
-                  )
-                }
-                className="w-full border rounded-xl p-3"
-                placeholder="Eyebrow"
-              />
+            {/* ADD NEW */}
 
-              <textarea
-                value={content.hero.title}
-                onChange={(e) =>
-                  updateHero(
-                    "title",
-                    e.target.value
-                  )
-                }
-                rows={3}
-                className="w-full border rounded-xl p-3"
-                placeholder="Hero heading"
-              />
+            <section className="border rounded-2xl p-4">
 
-              <textarea
-                value={content.hero.description}
-                onChange={(e) =>
-                  updateHero(
-                    "description",
-                    e.target.value
-                  )
-                }
-                rows={4}
-                className="w-full border rounded-xl p-3"
-                placeholder="Hero description"
-              />
+              <h2 className="font-bold text-lg">
+                ➕ New Content
+              </h2>
 
-              <input
-                value={content.hero.image_alt}
-                onChange={(e) =>
-                  updateHero(
-                    "image_alt",
-                    e.target.value
-                  )
-                }
-                className="w-full border rounded-xl p-3"
-                placeholder="Image alt text"
-              />
+              <div className="grid grid-cols-2 gap-3 mt-4">
 
-              <div className="border rounded-2xl p-4">
+                <button
+                  onClick={
+                    addTextElement
+                  }
+                  className="border rounded-xl p-4 hover:bg-slate-50 font-semibold"
+                >
+                  ✏️
+                  <br />
+                  New Text
+                </button>
 
-                <label className="font-bold block mb-3">
-                  Hero Image
-                </label>
+                <button
+                  onClick={
+                    addImageElement
+                  }
+                  className="border rounded-xl p-4 hover:bg-slate-50 font-semibold"
+                >
+                  🖼️
+                  <br />
+                  New Image
+                </button>
+
+              </div>
+
+            </section>
+
+
+            {/* SELECTED ELEMENT */}
+
+            {selectedElement && (
+              <section className="border-2 border-green-500 rounded-2xl p-4">
+
+                <div className="flex justify-between items-center">
+
+                  <h2 className="font-bold">
+                    ✏️ Selected
+                  </h2>
+
+                  <button
+                    onClick={() =>
+                      deleteElement(
+                        selectedElement.id
+                      )
+                    }
+                    className="text-red-600 font-bold"
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
+
+                {selectedElement.type ===
+                  "text" && (
+                  <div className="space-y-4 mt-4">
+
+                    <textarea
+                      value={
+                        selectedElement.content
+                      }
+                      onChange={(e) =>
+                        updateElement(
+                          selectedElement.id,
+                          {
+                            content:
+                              e.target
+                                .value,
+                          }
+                        )
+                      }
+                      rows={5}
+                      className="w-full border rounded-xl p-3"
+                      placeholder="Text"
+                    />
+
+
+                    {/* FONT */}
+
+                    <div>
+
+                      <label className="text-sm font-semibold">
+                        Font
+                      </label>
+
+                      <select
+                        value={
+                          selectedElement
+                            .style
+                            .fontFamily
+                        }
+                        onChange={(e) =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              fontFamily:
+                                e.target
+                                  .value,
+                            }
+                          )
+                        }
+                        className="w-full border rounded-xl p-3 mt-1"
+                      >
+
+                        <option value="Arial, sans-serif">
+                          Arial
+                        </option>
+
+                        <option value="Georgia, serif">
+                          Georgia
+                        </option>
+
+                        <option value="Verdana, sans-serif">
+                          Verdana
+                        </option>
+
+                        <option value="'Trebuchet MS', sans-serif">
+                          Trebuchet MS
+                        </option>
+
+                        <option value="'Times New Roman', serif">
+                          Times New Roman
+                        </option>
+
+                      </select>
+
+                    </div>
+
+
+                    {/* SIZE + WEIGHT */}
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <label className="text-sm font-semibold">
+
+                        Font Size
+
+                        <input
+                          type="number"
+                          min="8"
+                          max="120"
+                          value={
+                            selectedElement
+                              .style
+                              .fontSize
+                          }
+                          onChange={(e) =>
+                            updateElementStyle(
+                              selectedElement.id,
+                              {
+                                fontSize:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        />
+
+                      </label>
+
+
+                      <label className="text-sm font-semibold">
+
+                        Weight
+
+                        <select
+                          value={
+                            selectedElement
+                              .style
+                              .fontWeight
+                          }
+                          onChange={(e) =>
+                            updateElementStyle(
+                              selectedElement.id,
+                              {
+                                fontWeight:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        >
+
+                          <option value="400">
+                            Normal
+                          </option>
+
+                          <option value="500">
+                            Medium
+                          </option>
+
+                          <option value="600">
+                            Semi Bold
+                          </option>
+
+                          <option value="700">
+                            Bold
+                          </option>
+
+                          <option value="800">
+                            Extra Bold
+                          </option>
+
+                        </select>
+
+                      </label>
+
+                    </div>
+
+
+                    {/* TEXT BUTTONS */}
+
+                    <div className="grid grid-cols-4 gap-2">
+
+                      <button
+                        onClick={() =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              fontWeight:
+                                selectedElement
+                                  .style
+                                  .fontWeight ===
+                                700
+                                  ? 400
+                                  : 700,
+                            }
+                          )
+                        }
+                        className="border rounded-lg p-2 font-bold"
+                      >
+                        B
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              fontStyle:
+                                selectedElement
+                                  .style
+                                  .fontStyle ===
+                                "italic"
+                                  ? "normal"
+                                  : "italic",
+                            }
+                          )
+                        }
+                        className="border rounded-lg p-2 italic"
+                      >
+                        I
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              textDecoration:
+                                selectedElement
+                                  .style
+                                  .textDecoration ===
+                                "underline"
+                                  ? "none"
+                                  : "underline",
+                            }
+                          )
+                        }
+                        className="border rounded-lg p-2 underline"
+                      >
+                        U
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const current =
+                            selectedElement
+                              .style
+                              .textAlign;
+
+                          const next =
+                            current ===
+                            "left"
+                              ? "center"
+                              : current ===
+                                "center"
+                              ? "right"
+                              : "left";
+
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              textAlign:
+                                next,
+                            }
+                          );
+                        }}
+                        className="border rounded-lg p-2"
+                      >
+                        ≡
+                      </button>
+
+                    </div>
+
+
+                    {/* COLORS */}
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <label className="text-sm font-semibold">
+
+                        Text Color
+
+                        <input
+                          type="color"
+                          value={
+                            selectedElement
+                              .style
+                              .color
+                          }
+                          onChange={(e) =>
+                            updateElementStyle(
+                              selectedElement.id,
+                              {
+                                color:
+                                  e.target
+                                    .value,
+                              }
+                            )
+                          }
+                          className="w-full h-10 mt-1"
+                        />
+
+                      </label>
+
+
+                      <label className="text-sm font-semibold">
+
+                        Background
+
+                        <input
+                          type="color"
+                          value={
+                            selectedElement
+                              .style
+                              .backgroundColor ===
+                            "transparent"
+                              ? "#ffffff"
+                              : selectedElement
+                                  .style
+                                  .backgroundColor
+                          }
+                          onChange={(e) =>
+                            updateElementStyle(
+                              selectedElement.id,
+                              {
+                                backgroundColor:
+                                  e.target
+                                    .value,
+                              }
+                            )
+                          }
+                          className="w-full h-10 mt-1"
+                        />
+
+                      </label>
+
+                    </div>
+
+
+                    {/* LINE HEIGHT */}
+
+                    <label className="text-sm font-semibold block">
+
+                      Line Height
+
+                      <input
+                        type="range"
+                        min="1"
+                        max="2"
+                        step="0.1"
+                        value={
+                          selectedElement
+                            .style
+                            .lineHeight
+                        }
+                        onChange={(e) =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              lineHeight:
+                                Number(
+                                  e.target
+                                    .value
+                                ),
+                            }
+                          )
+                        }
+                        className="w-full mt-2"
+                      />
+
+                    </label>
+
+
+                    {/* LETTER SPACING */}
+
+                    <label className="text-sm font-semibold block">
+
+                      Letter Spacing
+
+                      <input
+                        type="range"
+                        min="-2"
+                        max="10"
+                        step="0.5"
+                        value={
+                          selectedElement
+                            .style
+                            .letterSpacing
+                        }
+                        onChange={(e) =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              letterSpacing:
+                                Number(
+                                  e.target
+                                    .value
+                                ),
+                            }
+                          )
+                        }
+                        className="w-full mt-2"
+                      />
+
+                    </label>
+
+
+                    {/* OPACITY */}
+
+                    <label className="text-sm font-semibold block">
+
+                      Opacity
+
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.1"
+                        value={
+                          selectedElement
+                            .style
+                            .opacity
+                        }
+                        onChange={(e) =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              opacity:
+                                Number(
+                                  e.target
+                                    .value
+                                ),
+                            }
+                          )
+                        }
+                        className="w-full mt-2"
+                      />
+
+                    </label>
+
+
+                    {/* RADIUS */}
+
+                    <label className="text-sm font-semibold block">
+
+                      Border Radius
+
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={
+                          selectedElement
+                            .style
+                            .borderRadius
+                        }
+                        onChange={(e) =>
+                          updateElementStyle(
+                            selectedElement.id,
+                            {
+                              borderRadius:
+                                Number(
+                                  e.target
+                                    .value
+                                ),
+                            }
+                          )
+                        }
+                        className="w-full mt-2"
+                      />
+
+                    </label>
+
+
+                    {/* SIZE */}
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <label className="text-sm font-semibold">
+
+                        Width
+
+                        <input
+                          type="number"
+                          min="30"
+                          max="1000"
+                          value={
+                            selectedElement.width
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selectedElement.id,
+                              {
+                                width:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        />
+
+                      </label>
+
+
+                      <label className="text-sm font-semibold">
+
+                        Height
+
+                        <input
+                          type="number"
+                          min="30"
+                          max="800"
+                          value={
+                            selectedElement.height
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selectedElement.id,
+                              {
+                                height:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        />
+
+                      </label>
+
+                    </div>
+
+                  </div>
+                )}
+
+
+                {/* IMAGE EDIT */}
+
+                {selectedElement.type ===
+                  "image" && (
+                  <div className="space-y-4 mt-4">
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+
+                        const file =
+                          e.target.files?.[0];
+
+                        if (file) {
+                          startCrop(
+                            file,
+                            {
+                              type:
+                                "element",
+                              id:
+                                selectedElement.id,
+                            }
+                          );
+                        }
+
+                      }}
+                      className="w-full"
+                    />
+
+
+                    {selectedElement.image_url && (
+                      <img
+                        src={
+                          selectedElement.image_url
+                        }
+                        alt=""
+                        className="w-full h-44 object-cover rounded-xl"
+                      />
+                    )}
+
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <label className="text-sm font-semibold">
+
+                        Width
+
+                        <input
+                          type="number"
+                          min="50"
+                          max="1000"
+                          value={
+                            selectedElement.width
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selectedElement.id,
+                              {
+                                width:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        />
+
+                      </label>
+
+
+                      <label className="text-sm font-semibold">
+
+                        Height
+
+                        <input
+                          type="number"
+                          min="50"
+                          max="800"
+                          value={
+                            selectedElement.height
+                          }
+                          onChange={(e) =>
+                            updateElement(
+                              selectedElement.id,
+                              {
+                                height:
+                                  Number(
+                                    e.target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full border rounded-xl p-2 mt-1"
+                        />
+
+                      </label>
+
+                    </div>
+
+
+                    <label className="text-sm font-semibold block">
+
+                      Image Fit
+
+                      <select
+                        value={
+                          selectedElement.objectFit
+                        }
+                        onChange={(e) =>
+                          updateElement(
+                            selectedElement.id,
+                            {
+                              objectFit:
+                                e.target
+                                  .value as
+                                  | "cover"
+                                  | "contain"
+                                  | "fill",
+                            }
+                          )
+                        }
+                        className="w-full border rounded-xl p-3 mt-1"
+                      >
+
+                        <option value="cover">
+                          Crop / Cover
+                        </option>
+
+                        <option value="contain">
+                          Fit / Contain
+                        </option>
+
+                        <option value="fill">
+                          Fill
+                        </option>
+
+                      </select>
+
+                    </label>
+
+                  </div>
+                )}
+
+              </section>
+            )}
+
+
+            {/* HERO */}
+
+            <section className="border rounded-2xl p-4">
+
+              <h2 className="font-bold text-lg">
+                🚜 Hero Section
+              </h2>
+
+              <div className="space-y-3 mt-4">
+
+                <input
+                  value={
+                    content.hero.badge
+                  }
+                  onChange={(e) =>
+                    updateHero(
+                      "badge",
+                      e.target.value
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
+
+                <input
+                  value={
+                    content.hero.eyebrow
+                  }
+                  onChange={(e) =>
+                    updateHero(
+                      "eyebrow",
+                      e.target.value
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
+
+                <textarea
+                  value={
+                    content.hero.title
+                  }
+                  onChange={(e) =>
+                    updateHero(
+                      "title",
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  className="w-full border rounded-xl p-3"
+                />
+
+                <textarea
+                  value={
+                    content.hero.description
+                  }
+                  onChange={(e) =>
+                    updateHero(
+                      "description",
+                      e.target.value
+                    )
+                  }
+                  rows={4}
+                  className="w-full border rounded-xl p-3"
+                />
+
+                <input
+                  value={
+                    content.hero.image_alt
+                  }
+                  onChange={(e) =>
+                    updateHero(
+                      "image_alt",
+                      e.target.value
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
 
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
+
                     const file =
                       e.target.files?.[0];
 
                     if (file) {
-                      uploadImage(file, {
-                        type: "hero",
-                      });
+                      startCrop(
+                        file,
+                        {
+                          type:
+                            "hero",
+                        }
+                      );
                     }
+
                   }}
                   className="w-full"
                 />
 
                 {content.hero.image_url && (
                   <img
-                    src={content.hero.image_url}
-                    alt={content.hero.image_alt}
-                    className="mt-4 w-full h-48 object-cover rounded-xl"
+                    src={
+                      content.hero.image_url
+                    }
+                    alt={
+                      content.hero.image_alt
+                    }
+                    className="w-full h-40 object-cover rounded-xl"
                   />
                 )}
 
               </div>
 
-              <div>
-
-                <label className="font-semibold block mb-2">
-                  Theme Colour
-                </label>
-
-                <div className="flex gap-3">
-
-                  <input
-                    type="color"
-                    value={brand}
-                    onChange={(e) =>
-                      setBrand(e.target.value)
-                    }
-                    className="w-16 h-12"
-                  />
-
-                  <input
-                    value={brand}
-                    onChange={(e) =>
-                      setBrand(e.target.value)
-                    }
-                    className="flex-1 border rounded-xl p-3"
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </section>
-
-
-          {/* NEWS EDITOR */}
-
-          <section className="bg-white rounded-3xl shadow-sm p-6">
-
-            <h2 className="text-xl font-bold">
-              📰 News Columns
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              ಮೂರು News columnsನ content ಮತ್ತು images edit ಮಾಡಿ.
-            </p>
-
-            <div className="space-y-6 mt-5">
-
-              {content.news.map(
-                (item, index) => (
-
-                  <div
-                    key={index}
-                    className="border rounded-2xl p-5"
-                  >
-
-                    <div className="flex justify-between items-center mb-4">
-
-                      <h3 className="font-bold">
-                        News Column {index + 1}
-                      </h3>
-
-                    </div>
-
-                    <div className="space-y-3">
-
-                      <input
-                        value={item.category}
-                        onChange={(e) =>
-                          updateNews(
-                            index,
-                            "category",
-                            e.target.value
-                          )
-                        }
-                        className="w-full border rounded-xl p-3"
-                        placeholder="Category"
-                      />
-
-                      <input
-                        value={item.title}
-                        onChange={(e) =>
-                          updateNews(
-                            index,
-                            "title",
-                            e.target.value
-                          )
-                        }
-                        className="w-full border rounded-xl p-3"
-                        placeholder="News title"
-                      />
-
-                      <textarea
-                        value={item.description}
-                        onChange={(e) =>
-                          updateNews(
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        rows={4}
-                        className="w-full border rounded-xl p-3"
-                        placeholder="News description"
-                      />
-
-                      <input
-                        value={item.image_url}
-                        onChange={(e) =>
-                          updateNews(
-                            index,
-                            "image_url",
-                            e.target.value
-                          )
-                        }
-                        className="w-full border rounded-xl p-3"
-                        placeholder="Image URL"
-                      />
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file =
-                            e.target.files?.[0];
-
-                          if (file) {
-                            uploadImage(file, {
-                              type: "news",
-                              index,
-                            });
-                          }
-                        }}
-                        className="w-full"
-                      />
-
-                      {item.image_url && (
-                        <img
-                          src={item.image_url}
-                          alt={item.title}
-                          className="w-full h-40 object-cover rounded-xl"
-                        />
-                      )}
-
-                    </div>
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-          </section>
-
-
-          {/* PROCESS EDITOR */}
-
-          <section className="bg-white rounded-3xl shadow-sm p-6">
-
-            <h2 className="text-xl font-bold">
-              📋 Membership Process
-            </h2>
-
-            <div className="space-y-4 mt-5">
-
-              <input
-                value={content.process.title}
-                onChange={(e) =>
-                  updateProcessMain(
-                    "title",
-                    e.target.value
-                  )
-                }
-                className="w-full border rounded-xl p-3"
-                placeholder="Process title"
-              />
-
-              <textarea
-                value={content.process.description}
-                onChange={(e) =>
-                  updateProcessMain(
-                    "description",
-                    e.target.value
-                  )
-                }
-                rows={3}
-                className="w-full border rounded-xl p-3"
-                placeholder="Process description"
-              />
-
-              {content.process.items.map(
-                (item, index) => (
-
-                  <div
-                    key={index}
-                    className="border rounded-2xl p-4"
-                  >
-
-                    <h3 className="font-bold mb-3">
-                      Step {index + 1}
-                    </h3>
-
-                    <input
-                      value={item.number}
-                      onChange={(e) =>
-                        updateProcess(
-                          index,
-                          "number",
-                          e.target.value
-                        )
-                      }
-                      className="w-full border rounded-xl p-3 mb-3"
-                      placeholder="Number"
-                    />
-
-                    <input
-                      value={item.title}
-                      onChange={(e) =>
-                        updateProcess(
-                          index,
-                          "title",
-                          e.target.value
-                        )
-                      }
-                      className="w-full border rounded-xl p-3 mb-3"
-                      placeholder="Title"
-                    />
-
-                    <textarea
-                      value={item.description}
-                      onChange={(e) =>
-                        updateProcess(
-                          index,
-                          "description",
-                          e.target.value
-                        )
-                      }
-                      rows={3}
-                      className="w-full border rounded-xl p-3"
-                      placeholder="Description"
-                    />
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-          </section>
-
-
-          {/* CTA EDITOR */}
-
-          <section className="bg-white rounded-3xl shadow-sm p-6">
-
-            <h2 className="text-xl font-bold">
-              📢 Bottom CTA
-            </h2>
-
-            <div className="space-y-4 mt-5">
-
-              <input
-                value={content.cta.title}
-                onChange={(e) =>
-                  updateCta(
-                    "title",
-                    e.target.value
-                  )
-                }
-                className="w-full border rounded-xl p-3"
-                placeholder="CTA title"
-              />
-
-              <textarea
-                value={content.cta.description}
-                onChange={(e) =>
-                  updateCta(
-                    "description",
-                    e.target.value
-                  )
-                }
-                rows={4}
-                className="w-full border rounded-xl p-3"
-                placeholder="CTA description"
-              />
-
-            </div>
-
-          </section>
-
-        </div>
-
-
-        {/* LIVE PREVIEW */}
-
-        <section className="bg-white rounded-3xl shadow-sm p-6 mt-6">
-
-          <div className="flex justify-between items-center mb-5">
-
-            <div>
-              <h2 className="text-xl font-bold">
-                👁️ Live Website Preview
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-1">
-                Edit ಮಾಡಿದ ತಕ್ಷಣ preview ಬದಲಾಗುತ್ತದೆ.
-              </p>
-            </div>
-
-            <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
-              LIVE PREVIEW
-            </span>
-
-          </div>
-
-
-          <div className="border rounded-3xl overflow-hidden">
-
-            {/* HERO */}
-
-            <div
-              style={{
-                background:
-                  `linear-gradient(135deg, ${brand}, #166534)`,
-              }}
-              className="text-white p-8 md:p-14"
-            >
-
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-
-                <div>
-
-                  <div className="inline-block bg-white/15 px-4 py-2 rounded-full text-sm font-semibold">
-                    {content.hero.badge}
-                  </div>
-
-                  <p className="text-sm mt-5 opacity-80">
-                    {content.hero.eyebrow}
-                  </p>
-
-                  <h1 className="text-3xl md:text-5xl font-extrabold mt-3">
-                    {content.hero.title}
-                  </h1>
-
-                  <p className="mt-4 text-lg whitespace-pre-line">
-                    {content.hero.description}
-                  </p>
-
-                  <button className="bg-white text-slate-900 font-bold px-6 py-3 rounded-xl mt-6">
-                    ಸದಸ್ಯತ್ವ ನೋಂದಣಿ →
-                  </button>
-
-                </div>
-
-                <div>
-
-                  {content.hero.image_url ? (
-                    <img
-                      src={content.hero.image_url}
-                      alt={content.hero.image_alt}
-                      className="w-full h-64 object-cover rounded-3xl"
-                    />
-                  ) : (
-                    <div className="h-64 rounded-3xl bg-white/10 flex items-center justify-center text-7xl">
-                      🚜🌾
-                    </div>
-                  )}
-
-                </div>
-
-              </div>
-
-            </div>
+            </section>
 
 
             {/* NEWS */}
 
-            <div className="p-6 md:p-10 bg-[#f5f8f1]">
+            <section className="border rounded-2xl p-4">
 
-              <div className="text-center mb-8">
+              <h2 className="font-bold text-lg">
+                📰 News Columns
+              </h2>
 
-                <p
-                  style={{
-                    color: brand,
-                  }}
-                  className="font-bold"
-                >
-                  🌾 ರೈತ ಸುದ್ದಿ
-                </p>
-
-                <h2 className="text-3xl font-extrabold mt-2">
-                  ರೈತರಿಗೆ ಉಪಯುಕ್ತ ಮಾಹಿತಿ ಮತ್ತು ಸುದ್ದಿ
-                </h2>
-
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-5">
+              <div className="space-y-5 mt-4">
 
                 {content.news.map(
                   (item, index) => (
 
                     <div
                       key={index}
-                      className="bg-white rounded-2xl overflow-hidden border shadow-sm"
+                      className="border rounded-xl p-4"
                     >
 
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.title}
-                          className="w-full h-40 object-cover"
+                      <h3 className="font-bold mb-3">
+                        News Column{" "}
+                        {index + 1}
+                      </h3>
+
+                      <div className="space-y-3">
+
+                        <input
+                          value={
+                            item.category
+                          }
+                          onChange={(e) =>
+                            updateNews(
+                              index,
+                              "category",
+                              e.target.value
+                            )
+                          }
+                          className="w-full border rounded-xl p-3"
                         />
-                      ) : (
-                        <div className="w-full h-40 bg-green-100 flex items-center justify-center text-5xl">
-                          🌾
-                        </div>
-                      )}
 
-                      <div className="p-5">
+                        <input
+                          value={
+                            item.title
+                          }
+                          onChange={(e) =>
+                            updateNews(
+                              index,
+                              "title",
+                              e.target.value
+                            )
+                          }
+                          className="w-full border rounded-xl p-3"
+                        />
 
-                        <p
-                          style={{
-                            color: brand,
+                        <textarea
+                          value={
+                            item.description
+                          }
+                          onChange={(e) =>
+                            updateNews(
+                              index,
+                              "description",
+                              e.target.value
+                            )
+                          }
+                          rows={4}
+                          className="w-full border rounded-xl p-3"
+                        />
+
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+
+                            const file =
+                              e.target.files?.[0];
+
+                            if (file) {
+                              startCrop(
+                                file,
+                                {
+                                  type:
+                                    "news",
+                                  index,
+                                }
+                              );
+                            }
+
                           }}
-                          className="text-sm font-bold"
-                        >
-                          {item.category}
-                        </p>
+                          className="w-full"
+                        />
 
-                        <h3 className="font-extrabold text-xl mt-2">
-                          {item.title}
-                        </h3>
-
-                        <p className="text-slate-600 mt-2 leading-6">
-                          {item.description}
-                        </p>
-
-                        <button
-                          style={{
-                            color: brand,
-                          }}
-                          className="mt-4 font-bold"
-                        >
-                          ಇನ್ನಷ್ಟು ಓದಿ →
-                        </button>
+                        {item.image_url && (
+                          <img
+                            src={
+                              item.image_url
+                            }
+                            alt={
+                              item.title
+                            }
+                            className="w-full h-32 object-cover rounded-xl"
+                          />
+                        )}
 
                       </div>
 
@@ -1023,51 +1944,97 @@ export default function Editor() {
 
               </div>
 
-            </div>
+            </section>
 
 
             {/* PROCESS */}
 
-            <div className="p-6 md:p-10">
+            <section className="border rounded-2xl p-4">
 
-              <div className="text-center mb-8">
+              <h2 className="font-bold text-lg">
+                📋 Membership Process
+              </h2>
 
-                <h2 className="text-3xl font-extrabold">
-                  {content.process.title}
-                </h2>
+              <div className="space-y-3 mt-4">
 
-                <p className="text-slate-500 mt-2">
-                  {content.process.description}
-                </p>
+                <input
+                  value={
+                    content.process.title
+                  }
+                  onChange={(e) =>
+                    updateProcessMain(
+                      "title",
+                      e.target.value
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
 
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-5">
+                <textarea
+                  value={
+                    content.process
+                      .description
+                  }
+                  onChange={(e) =>
+                    updateProcessMain(
+                      "description",
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  className="w-full border rounded-xl p-3"
+                />
 
                 {content.process.items.map(
                   (item, index) => (
 
                     <div
                       key={index}
-                      className="border rounded-2xl p-6"
+                      className="border rounded-xl p-3"
                     >
 
-                      <div
-                        style={{
-                          color: brand,
-                        }}
-                        className="font-extrabold text-lg"
-                      >
-                        {item.number}
-                      </div>
+                      <input
+                        value={
+                          item.number
+                        }
+                        onChange={(e) =>
+                          updateProcess(
+                            index,
+                            "number",
+                            e.target.value
+                          )
+                        }
+                        className="w-full border rounded-xl p-3 mb-2"
+                      />
 
-                      <h3 className="font-bold text-xl mt-3">
-                        {item.title}
-                      </h3>
+                      <input
+                        value={
+                          item.title
+                        }
+                        onChange={(e) =>
+                          updateProcess(
+                            index,
+                            "title",
+                            e.target.value
+                          )
+                        }
+                        className="w-full border rounded-xl p-3 mb-2"
+                      />
 
-                      <p className="text-slate-600 mt-2">
-                        {item.description}
-                      </p>
+                      <textarea
+                        value={
+                          item.description
+                        }
+                        onChange={(e) =>
+                          updateProcess(
+                            index,
+                            "description",
+                            e.target.value
+                          )
+                        }
+                        rows={3}
+                        className="w-full border rounded-xl p-3"
+                      />
 
                     </div>
 
@@ -1076,29 +2043,571 @@ export default function Editor() {
 
               </div>
 
-            </div>
+            </section>
 
 
             {/* CTA */}
 
-            <div
-              style={{
-                backgroundColor: brand,
-              }}
-              className="p-10 text-center text-white"
-            >
+            <section className="border rounded-2xl p-4">
 
-              <h2 className="text-3xl font-extrabold">
-                {content.cta.title}
+              <h2 className="font-bold text-lg">
+                📢 Bottom CTA
               </h2>
 
-              <p className="mt-3">
-                {content.cta.description}
-              </p>
+              <div className="space-y-3 mt-4">
 
-              <button className="bg-white text-slate-900 font-bold px-7 py-3 rounded-xl mt-6">
-                Register Now →
-              </button>
+                <input
+                  value={
+                    content.cta.title
+                  }
+                  onChange={(e) =>
+                    updateCta(
+                      "title",
+                      e.target.value
+                    )
+                  }
+                  className="w-full border rounded-xl p-3"
+                />
+
+                <textarea
+                  value={
+                    content.cta.description
+                  }
+                  onChange={(e) =>
+                    updateCta(
+                      "description",
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  className="w-full border rounded-xl p-3"
+                />
+
+              </div>
+
+            </section>
+
+
+            {/* COLOR */}
+
+            <section className="border rounded-2xl p-4">
+
+              <label className="font-bold block mb-3">
+                🎨 Theme Colour
+              </label>
+
+              <div className="flex gap-3">
+
+                <input
+                  type="color"
+                  value={brand}
+                  onChange={(e) =>
+                    setBrand(
+                      e.target.value
+                    )
+                  }
+                  className="w-16 h-12"
+                />
+
+                <input
+                  value={brand}
+                  onChange={(e) =>
+                    setBrand(
+                      e.target.value
+                    )
+                  }
+                  className="flex-1 border rounded-xl p-3"
+                />
+
+              </div>
+
+            </section>
+
+          </div>
+
+        </aside>
+
+
+        {/* PREVIEW */}
+
+        <section className="h-full overflow-y-auto bg-slate-200">
+
+          <div className="sticky top-0 z-30 bg-white border-b px-5 py-3 flex justify-between items-center">
+
+            <div>
+              <h2 className="font-bold">
+                👁️ Live Preview
+              </h2>
+
+              <p className="text-xs text-slate-500">
+                New Text / Image select ಮಾಡಿ drag ಮಾಡಿ.
+              </p>
+            </div>
+
+            <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              LIVE
+            </span>
+
+          </div>
+
+
+          <div className="p-6">
+
+            <div
+              ref={previewRef}
+              onPointerDown={() =>
+                setSelectedElementId(null)
+              }
+              className="relative mx-auto max-w-[1100px] min-h-[1200px] bg-white rounded-3xl shadow-xl overflow-hidden"
+            >
+
+              {/* HERO */}
+
+              <section
+                style={{
+                  background:
+                    `linear-gradient(135deg, ${brand}, #166534)`,
+                }}
+                className="text-white p-10 md:p-14"
+              >
+
+                <div className="grid md:grid-cols-2 gap-8 items-center">
+
+                  <div>
+
+                    <div className="inline-block bg-white/15 px-4 py-2 rounded-full text-sm font-semibold">
+                      {
+                        content.hero
+                          .badge
+                      }
+                    </div>
+
+                    <p className="text-sm mt-5 opacity-80">
+                      {
+                        content.hero
+                          .eyebrow
+                      }
+                    </p>
+
+                    <h1 className="text-4xl md:text-6xl font-extrabold mt-3">
+                      {
+                        content.hero
+                          .title
+                      }
+                    </h1>
+
+                    <p className="mt-5 text-lg whitespace-pre-line">
+                      {
+                        content.hero
+                          .description
+                      }
+                    </p>
+
+                  </div>
+
+                  <div>
+
+                    {content.hero
+                      .image_url ? (
+                      <img
+                        src={
+                          content.hero
+                            .image_url
+                        }
+                        alt={
+                          content.hero
+                            .image_alt
+                        }
+                        className="w-full h-72 object-cover rounded-3xl"
+                      />
+                    ) : (
+                      <div className="h-72 rounded-3xl bg-white/10 flex items-center justify-center text-7xl">
+                        🚜🌾
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </section>
+
+
+              {/* NEWS */}
+
+              <section className="p-6 md:p-10 bg-[#f5f8f1]">
+
+                <div className="text-center mb-8">
+
+                  <p
+                    style={{
+                      color: brand,
+                    }}
+                    className="font-bold"
+                  >
+                    🌾 ರೈತ ಸುದ್ದಿ
+                  </p>
+
+                  <h2 className="text-3xl font-extrabold mt-2">
+                    ರೈತರಿಗೆ ಉಪಯುಕ್ತ ಮಾಹಿತಿ ಮತ್ತು ಸುದ್ದಿ
+                  </h2>
+
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-5">
+
+                  {content.news.map(
+                    (item, index) => (
+
+                      <div
+                        key={index}
+                        className="bg-white rounded-2xl overflow-hidden border shadow-sm"
+                      >
+
+                        {item.image_url ? (
+                          <img
+                            src={
+                              item.image_url
+                            }
+                            alt={
+                              item.title
+                            }
+                            className="w-full h-40 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-40 bg-green-100 flex items-center justify-center text-5xl">
+                            🌾
+                          </div>
+                        )}
+
+                        <div className="p-5">
+
+                          <p
+                            style={{
+                              color: brand,
+                            }}
+                            className="text-sm font-bold"
+                          >
+                            {
+                              item.category
+                            }
+                          </p>
+
+                          <h3 className="font-extrabold text-xl mt-2">
+                            {
+                              item.title
+                            }
+                          </h3>
+
+                          <p className="text-slate-600 mt-2 leading-6">
+                            {
+                              item.description
+                            }
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              </section>
+
+
+              {/* PROCESS */}
+
+              <section className="p-6 md:p-10">
+
+                <div className="text-center mb-8">
+
+                  <h2 className="text-3xl font-extrabold">
+                    {
+                      content.process
+                        .title
+                    }
+                  </h2>
+
+                  <p className="text-slate-500 mt-2">
+                    {
+                      content.process
+                        .description
+                    }
+                  </p>
+
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-5">
+
+                  {content.process.items.map(
+                    (item, index) => (
+
+                      <div
+                        key={index}
+                        className="border rounded-2xl p-6"
+                      >
+
+                        <div
+                          style={{
+                            color: brand,
+                          }}
+                          className="font-extrabold"
+                        >
+                          {
+                            item.number
+                          }
+                        </div>
+
+                        <h3 className="font-bold text-xl mt-3">
+                          {
+                            item.title
+                          }
+                        </h3>
+
+                        <p className="text-slate-600 mt-2">
+                          {
+                            item.description
+                          }
+                        </p>
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              </section>
+
+
+              {/* CTA */}
+
+              <section
+                style={{
+                  backgroundColor:
+                    brand,
+                }}
+                className="p-10 text-center text-white"
+              >
+
+                <h2 className="text-3xl font-extrabold">
+                  {
+                    content.cta
+                      .title
+                  }
+                </h2>
+
+                <p className="mt-3">
+                  {
+                    content.cta
+                      .description
+                  }
+                </p>
+
+              </section>
+
+
+              {/* DRAGGABLE NEW ELEMENTS */}
+
+              {content.elements.map(
+                (element) => {
+
+                  const elementStyle: CSSProperties = {
+                    position:
+                      "absolute",
+
+                    left:
+                      element.x,
+
+                    top:
+                      element.y,
+
+                    width:
+                      element.width,
+
+                    height:
+                      element.height,
+
+                    zIndex:
+                      element.zIndex,
+
+                    cursor:
+                      "move",
+
+                    touchAction:
+                      "none",
+
+                    userSelect:
+                      "none",
+                  };
+
+                  return (
+                    <div
+                      key={
+                        element.id
+                      }
+                      style={
+                        elementStyle
+                      }
+                      onPointerDown={(
+                        e
+                      ) => {
+
+                        e.stopPropagation();
+
+                        setSelectedElementId(
+                          element.id
+                        );
+
+                        moveElement(
+                          element.id,
+                          e
+                        );
+
+                      }}
+                      className={`border-2 ${
+                        selectedElementId ===
+                        element.id
+                          ? "border-green-500"
+                          : "border-transparent hover:border-slate-300"
+                      }`}
+                    >
+
+                      {element.type ===
+                        "text" && (
+                        <div
+                          style={{
+                            width:
+                              "100%",
+
+                            height:
+                              "100%",
+
+                            fontFamily:
+                              element
+                                .style
+                                .fontFamily,
+
+                            fontSize:
+                              element
+                                .style
+                                .fontSize,
+
+                            fontWeight:
+                              element
+                                .style
+                                .fontWeight,
+
+                            fontStyle:
+                              element
+                                .style
+                                .fontStyle,
+
+                            textDecoration:
+                              element
+                                .style
+                                .textDecoration,
+
+                            textAlign:
+                              element
+                                .style
+                                .textAlign,
+
+                            color:
+                              element
+                                .style
+                                .color,
+
+                            backgroundColor:
+                              element
+                                .style
+                                .backgroundColor,
+
+                            lineHeight:
+                              element
+                                .style
+                                .lineHeight,
+
+                            letterSpacing:
+                              element
+                                .style
+                                .letterSpacing,
+
+                            opacity:
+                              element
+                                .style
+                                .opacity,
+
+                            borderRadius:
+                              element
+                                .style
+                                .borderRadius,
+
+                            padding:
+                              8,
+
+                            overflow:
+                              "hidden",
+
+                            whiteSpace:
+                              "pre-wrap",
+                          }}
+                        >
+                          {
+                            element.content
+                          }
+                        </div>
+                      )}
+
+
+                      {element.type ===
+                        "image" && (
+                        element.image_url ? (
+                          <img
+                            src={
+                              element.image_url
+                            }
+                            alt=""
+                            draggable={
+                              false
+                            }
+                            style={{
+                              width:
+                                "100%",
+
+                              height:
+                                "100%",
+
+                              objectFit:
+                                element.objectFit,
+
+                              pointerEvents:
+                                "none",
+
+                              borderRadius:
+                                element
+                                  .style
+                                  .borderRadius,
+
+                              opacity:
+                                element
+                                  .style
+                                  .opacity,
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-slate-100 flex items-center justify-center text-5xl">
+                            🖼️
+                          </div>
+                        )
+                      )}
+
+                    </div>
+                  );
+                }
+              )}
 
             </div>
 
@@ -1107,6 +2616,193 @@ export default function Editor() {
         </section>
 
       </div>
+
+
+      {/* CROP PREVIEW */}
+
+      {cropSource && (
+        <div className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center p-4">
+
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[95vh] overflow-y-auto p-6">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <h2 className="text-2xl font-bold">
+                  🖼️ Image Crop Preview
+                </h2>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Crop ಮಾಡಿ ನಂತರ Upload ಮಾಡಿದರೆ image previewನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.
+                </p>
+
+              </div>
+
+              <button
+                onClick={() => {
+                  setCropSource(null);
+                  setCropTarget(null);
+                }}
+                className="text-xl text-slate-500"
+              >
+                ✕
+              </button>
+
+            </div>
+
+
+            {/* IMAGE PREVIEW */}
+
+            <div className="mt-6 bg-slate-100 rounded-2xl p-5">
+
+              <div className="relative mx-auto max-w-2xl aspect-[3/2] overflow-hidden rounded-2xl bg-black">
+
+                <img
+                  src={cropSource}
+                  alt="Crop Preview"
+                  style={{
+                    position:
+                      "absolute",
+
+                    width:
+                      `${cropZoom * 100}%`,
+
+                    height:
+                      `${cropZoom * 100}%`,
+
+                    maxWidth:
+                      "none",
+
+                    left:
+                      `${50 - cropX * 0.5}%`,
+
+                    top:
+                      `${50 - cropY * 0.5}%`,
+
+                    transform:
+                      "translate(-50%, -50%)",
+
+                    objectFit:
+                      "cover",
+                  }}
+                  className="select-none"
+                />
+
+                <div className="absolute inset-0 border-4 border-white/80 rounded-2xl pointer-events-none" />
+
+              </div>
+
+            </div>
+
+
+            {/* CROP CONTROLS */}
+
+            <div className="grid md:grid-cols-3 gap-5 mt-6">
+
+              <label className="text-sm font-semibold">
+
+                Horizontal Position
+
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={cropX}
+                  onChange={(e) =>
+                    setCropX(
+                      Number(
+                        e.target.value
+                      )
+                    )
+                  }
+                  className="w-full mt-2"
+                />
+
+              </label>
+
+
+              <label className="text-sm font-semibold">
+
+                Vertical Position
+
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={cropY}
+                  onChange={(e) =>
+                    setCropY(
+                      Number(
+                        e.target.value
+                      )
+                    )
+                  }
+                  className="w-full mt-2"
+                />
+
+              </label>
+
+
+              <label className="text-sm font-semibold">
+
+                Zoom
+
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.1"
+                  value={cropZoom}
+                  onChange={(e) =>
+                    setCropZoom(
+                      Number(
+                        e.target.value
+                      )
+                    )
+                  }
+                  className="w-full mt-2"
+                />
+
+              </label>
+
+            </div>
+
+
+            {/* ACTIONS */}
+
+            <div className="flex justify-end gap-3 mt-7">
+
+              <button
+                onClick={() => {
+                  setCropSource(null);
+                  setCropTarget(null);
+                }}
+                className="px-5 py-3 rounded-xl border font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={
+                  cropAndUpload
+                }
+                disabled={
+                  cropBusy
+                }
+                className="px-6 py-3 rounded-xl bg-green-600 text-white font-bold disabled:opacity-50"
+              >
+                {cropBusy
+                  ? "Uploading..."
+                  : "✂️ Crop & Upload"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
     </main>
   );
