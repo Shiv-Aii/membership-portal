@@ -108,40 +108,40 @@ function VerifyPageContent() {
        * applications table, and the Card page uses the
        * application's id as the unique member/card ID.
        */
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("id", cleanId)
-        .maybeSingle();
+      /*
+       * QR verification is public, so the browser is using the anon key.
+       * applications has RLS and does NOT allow public SELECT.
+       *
+       * The QR contains ONLY applications.id.
+       * The RPC performs the approved-member lookup server-side.
+       */
+      const { data, error } = await supabase.rpc(
+        "verify_application_by_id",
+        {
+          p_id: cleanId,
+        }
+      );
 
       if (error) {
         console.error("QR VERIFY ERROR:", error);
         throw error;
       }
 
-      /*
-       * The QR is identified ONLY by applications.id.
-       * Do not use membership_no for this lookup.
-       *
-       * Status is checked after the row is found so that
-       * "approved", "Approved", etc. are treated the same.
-       * is_deleted = NULL is allowed; only true is deleted.
-       */
-      const approved =
-        data &&
-        String(data.status ?? "").trim().toLowerCase() === "approved";
-
-      if (
-        !data ||
-        data.is_deleted === true ||
-        !approved
-      ) {
+      if (!data) {
         setMember(null);
         setVerifiedAt(null);
         return;
       }
 
-      setMember(data as Member);
+      const row = Array.isArray(data) ? data[0] : data;
+
+      if (!row) {
+        setMember(null);
+        setVerifiedAt(null);
+        return;
+      }
+
+      setMember(row as Member);
       setVerifiedAt(new Date());
     } catch (error: any) {
       console.error("QR VERIFY ERROR:", error);
