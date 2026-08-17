@@ -612,122 +612,64 @@ export default function Editor() {
   }
 
   async function cropAndUpload() {
-    if (
-      !cropSource ||
-      !cropTarget
-    ) {
+    if (!cropSource || !cropTarget) {
       return;
     }
 
     setCropBusy(true);
+    setMessage("Image uploading...");
 
     try {
-      const image =
-        new Image();
+      const image = new Image();
+      image.src = cropSource;
 
-      image.src =
-        cropSource;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () =>
+          reject(new Error("Image load failed"));
+      });
 
-      await new Promise<void>(
-        (resolve, reject) => {
-          image.onload = () =>
-            resolve();
+      const canvas = document.createElement("canvas");
 
-          image.onerror = () =>
-            reject(
-              new Error(
-                "Image load failed"
-              )
-            );
-        }
-      );
+      const outputWidth = 1200;
+      const outputHeight = 800;
 
-      const canvas =
-        document.createElement(
-          "canvas"
-        );
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
 
-      const outputWidth =
-        1200;
-
-      const outputHeight =
-        800;
-
-      canvas.width =
-        outputWidth;
-
-      canvas.height =
-        outputHeight;
-
-      const ctx =
-        canvas.getContext("2d");
+      const ctx = canvas.getContext("2d");
 
       if (!ctx) {
-        throw new Error(
-          "Canvas unavailable"
-        );
+        throw new Error("Canvas unavailable");
       }
 
-      const targetRatio =
-        outputWidth /
-        outputHeight;
+      const targetRatio = outputWidth / outputHeight;
+      const sourceRatio = image.width / image.height;
 
-      const sourceRatio =
-        image.width /
-        image.height;
+      let cropWidth = image.width;
+      let cropHeight = image.height;
 
-      let cropWidth =
-        image.width;
-
-      let cropHeight =
-        image.height;
-
-      if (
-        sourceRatio >
-        targetRatio
-      ) {
-        cropWidth =
-          image.height *
-          targetRatio;
+      if (sourceRatio > targetRatio) {
+        cropWidth = image.height * targetRatio;
       } else {
-        cropHeight =
-          image.width /
-          targetRatio;
+        cropHeight = image.width / targetRatio;
       }
 
-      cropWidth /=
-        cropZoom;
+      cropWidth /= cropZoom;
+      cropHeight /= cropZoom;
 
-      cropHeight /=
-        cropZoom;
+      const maxX = Math.max(0, image.width - cropWidth);
+      const maxY = Math.max(0, image.height - cropHeight);
 
-      const maxX =
-        image.width -
-        cropWidth;
+      const sourceX = Math.max(
+        0,
+        Math.min(maxX, (maxX * cropX) / 100)
+      );
 
-      const maxY =
-        image.height -
-        cropHeight;
-
-      const sourceX =
-        Math.max(
-          0,
-          Math.min(
-            maxX,
-            (maxX * cropX) /
-              100
-          )
-        );
-
-      const sourceY =
-        Math.max(
-          0,
-          Math.min(
-            maxY,
-            (maxY * cropY) /
-              100
-          )
-        );
+      const sourceY = Math.max(
+        0,
+        Math.min(maxY, (maxY * cropY) / 100)
+      );
 
       ctx.drawImage(
         image,
@@ -741,102 +683,105 @@ export default function Editor() {
         outputHeight
       );
 
-      const blob =
-        await new Promise<Blob | null>(
-          (resolve) =>
-            canvas.toBlob(
-              resolve,
-              "image/jpeg",
-              0.9
-            )
-        );
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/jpeg", 0.9);
+      });
 
       if (!blob) {
-        throw new Error(
-          "Crop failed"
-        );
+        throw new Error("Image conversion failed");
       }
 
       const filename =
-        `${Date.now()}-${Math.random()
+        `main-${Date.now()}-${Math.random()
           .toString(36)
-          .slice(2)}.jpg`;
+          .substring(2, 10)}.jpg`;
 
-      const path =
-        `main-page/${filename}`;
+      const path = `main-page/${filename}`;
 
-      const { error } =
+      const { error: uploadError } =
         await supabase.storage
           .from("site-images")
-          .upload(
-            path,
-            blob,
-            {
-              cacheControl:
-                "3600",
-              upsert: false,
-              contentType:
-                "image/jpeg",
-            }
-          );
+          .upload(path, blob, {
+            cacheControl: "3600",
+            contentType: "image/jpeg",
+            upsert: false,
+          });
 
-      if (error) {
-        throw error;
+      if (uploadError) {
+        console.error(
+          "SUPABASE IMAGE UPLOAD ERROR:",
+          uploadError
+        );
+
+        throw new Error(uploadError.message);
       }
 
-      const { data } =
+      const { data: publicData } =
         supabase.storage
           .from("site-images")
           .getPublicUrl(path);
 
-      const imageUrl =
-        data.publicUrl;
+      const imageUrl = publicData.publicUrl;
 
-      if (
-        cropTarget.type ===
-        "hero"
-      ) {
-        updateHero(
-          "image_url",
-          imageUrl
-        );
+      if (!imageUrl) {
+        throw new Error("Image URL generate ಆಗಲಿಲ್ಲ");
       }
 
-      if (
-        cropTarget.type ===
-        "news"
-      ) {
-        updateNews(
-          cropTarget.index,
-          "image_url",
-          imageUrl
-        );
+      if (cropTarget.type === "hero") {
+        setContent((prev) => ({
+          ...prev,
+          hero: {
+            ...prev.hero,
+            image_url: imageUrl,
+          },
+        }));
       }
 
-      if (
-        cropTarget.type ===
-        "element"
-      ) {
-        updateElement(
-          cropTarget.id,
-          {
-            image_url:
-              imageUrl,
-          }
-        );
+      if (cropTarget.type === "news") {
+        setContent((prev) => {
+          const news = [...prev.news];
+
+          news[cropTarget.index] = {
+            ...news[cropTarget.index],
+            image_url: imageUrl,
+          };
+
+          return {
+            ...prev,
+            news,
+          };
+        });
       }
+
+      if (cropTarget.type === "element") {
+        setContent((prev) => ({
+          ...prev,
+          elements: prev.elements.map((element) =>
+            element.id === cropTarget.id
+              ? {
+                  ...element,
+                  image_url: imageUrl,
+                }
+              : element
+          ),
+        }));
+      }
+
+      setMessage(
+        "✅ Image upload ಆಗಿದೆ. Previewನಲ್ಲಿ image ಕಾಣಿಸುತ್ತದೆ. Save Changes ಒತ್ತಿ."
+      );
 
       setCropSource(null);
       setCropTarget(null);
-
-      setMessage(
-        "✅ Image crop ಮಾಡಿ previewಗೆ ಸೇರಿಸಲಾಗಿದೆ."
-      );
     } catch (error) {
-      console.error(error);
+      console.error("IMAGE UPLOAD ERROR:", error);
 
       setMessage(
-        "❌ Image crop/upload ಆಗಲಿಲ್ಲ."
+        `❌ Image upload ಆಗಲಿಲ್ಲ: ${
+          error instanceof Error
+            ? error.message
+            : "Unknown error"
+        }`
       );
     } finally {
       setCropBusy(false);
@@ -1591,6 +1536,8 @@ export default function Editor() {
                           );
                         }
 
+                        e.currentTarget.value = "";
+
                       }}
                       className="w-full"
                     />
@@ -1811,6 +1758,8 @@ export default function Editor() {
                       );
                     }
 
+                    e.currentTarget.value = "";
+
                   }}
                   className="w-full"
                 />
@@ -1918,6 +1867,8 @@ export default function Editor() {
                                 }
                               );
                             }
+
+                            e.currentTarget.value = "";
 
                           }}
                           className="w-full"
