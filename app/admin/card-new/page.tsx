@@ -193,6 +193,17 @@ function applyMemberDataToElements(
     "ಆಧಾರ್ / Aadhaar Number"
   );
 
+  const vehicleNumber = textValue(
+    member,
+    [
+      "vehicle_number",
+      "vehicle_no",
+      "vehicleNumber",
+      "vehicle",
+    ],
+    ""
+  );
+
   const validFrom = dateValue(
     member,
     [
@@ -223,21 +234,23 @@ function applyMemberDataToElements(
   return current.map((element) => {
     switch (element.id) {
       case "name":
-        return { ...element, text: `ಹೆಸರು / Name: ${name}` };
+        return { ...element, text: `ಹೆಸರು : ${name}` };
       case "membership":
         return { ...element, text: `Membership No: ${membership}` };
       case "designation":
-        return { ...element, text: `ಹುದ್ದೆ / Designation: ${designation}` };
+        return { ...element, text: `ಹುದ್ದೆ  : ${designation}` };
       case "village":
-        return { ...element, text: `ಗ್ರಾಮ / Village: ${village}` };
+        return { ...element, text: `ಗ್ರಾಮ  : ${village}` };
       case "taluk":
-        return { ...element, text: `ತಾಲ್ಲೂಕು / Taluk: ${taluk}` };
+        return { ...element, text: `ತಾಲ್ಲೂಕು : ${taluk}` };
       case "district":
-        return { ...element, text: `ಜಿಲ್ಲೆ / District: ${district}` };
+        return { ...element, text: `ಜಿಲ್ಲೆ : ${district}` };
       case "mobile":
-        return { ...element, text: `ಮೊಬೈಲ್ / Mobile: ${mobile}` };
+        return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
       case "aadhaar":
-        return { ...element, text: `ಆಧಾರ್ / Aadhaar: ${aadhaar}` };
+        return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
+      case "vehicle-number":
+        return { ...element, text: `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}` };
       case "valid-from":
       case "back-valid-from":
         return { ...element, text: `VALID FROM: ${validFrom}` };
@@ -428,6 +441,22 @@ const initialElements: CardElement[] = [
   },
 
   {
+    id: "vehicle-number",
+    label: "ವಾಹನ ಸಂಖ್ಯೆ / Vehicle Number",
+    kind: "text",
+    text: "",
+    side: "front",
+    x: 255,
+    y: 431,
+    width: 365,
+    height: 30,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111111",
+    background: "transparent",
+  },
+
+  {
     id: "front-photo-label",
     label: "ಫೋಟೋ / Photo",
     kind: "text",
@@ -475,38 +504,6 @@ const initialElements: CardElement[] = [
     color: "#075c2b",
     background: "#ffffff",
     borderRadius: 12,
-  },
-
-  {
-    id: "valid-from",
-    label: "Valid From",
-    kind: "text",
-    text: "VALID FROM: 13-08-2026",
-    side: "front",
-    x: 300,
-    y: 415,
-    width: 250,
-    height: 35,
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#075c2b",
-    background: "#ffffff",
-  },
-
-  {
-    id: "valid-till",
-    label: "Valid Till",
-    kind: "text",
-    text: "VALID TILL: 12-08-2027",
-    side: "front",
-    x: 560,
-    y: 415,
-    width: 250,
-    height: 35,
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#075c2b",
-    background: "#ffffff",
   },
 
   {
@@ -664,6 +661,7 @@ const MEMBER_DATA_ELEMENT_IDS = new Set([
   "district",
   "mobile",
   "aadhaar",
+  "vehicle-number",
   "valid-from",
   "valid-till",
   "back-valid-from",
@@ -975,20 +973,48 @@ function NewCardDesignerPageContent() {
   useEffect(() => {
     async function createQR() {
       try {
+        const membershipNumber = textValue(
+          memberData,
+          [
+            "membership_number",
+            "membership_no",
+            "member_number",
+            "member_no",
+            "membership_id",
+            "card_number",
+          ],
+          memberId || "MEMBERSHIP_NUMBER"
+        );
+
         /*
-         * IMPORTANT:
-         * QR uses ONLY this member's unique database ID.
-         * Membership Number is NOT written into the QR.
+         * QR must identify THIS member.
+         * Send all common identifiers so the existing /verify page
+         * can use whichever parameter it already reads.
          */
-        if (!memberId) {
+        if (!memberId && !membershipNumber) {
           setQrImage("");
           return;
         }
 
+        const params = new URLSearchParams();
+
+        if (memberId) {
+          params.set("id", memberId);
+          params.set("member_id", memberId);
+          params.set("application_id", memberId);
+        }
+
+        if (
+          membershipNumber &&
+          membershipNumber !== "MEMBERSHIP_NUMBER"
+        ) {
+          params.set("membership", membershipNumber);
+        }
+
         const url =
           typeof window !== "undefined"
-            ? `${window.location.origin}/verify?id=${encodeURIComponent(memberId)}`
-            : `/verify?id=${encodeURIComponent(memberId)}`;
+            ? `${window.location.origin}/verify?${params.toString()}`
+            : `/verify?${params.toString()}`;
 
         const image =
           await QRCode.toDataURL(
@@ -1014,7 +1040,7 @@ function NewCardDesignerPageContent() {
     }
 
     createQR();
-  }, [memberId]);
+  }, [memberData, memberId]);
 
   /*
   =========================================
