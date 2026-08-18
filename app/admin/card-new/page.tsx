@@ -1625,7 +1625,7 @@ function NewCardDesignerPageContent() {
         }
 
         return `
-          <div style="${commonStyle};display:flex;align-items:center;">
+          <div style="${commonStyle};display:-webkit-box;align-items:center;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.15;">
             ${escapePrintHtml(element.text)}
           </div>
         `;
@@ -2411,10 +2411,14 @@ function NewCardDesignerPageContent() {
 
                             touchAction:
                               "none",
-                            lineHeight: 1.2,
+                            lineHeight: 1.15,
                             whiteSpace: "normal",
                             overflowWrap: "anywhere",
                             wordBreak: "break-word",
+                            display: "-webkit-box",
+                            WebkitBoxOrient: "vertical",
+                            WebkitLineClamp: 2,
+                            textOverflow: "clip",
                           }}
                         >
                           {element.text}
