@@ -233,30 +233,19 @@ function applyMemberDataToElements(
 
   return current.map((element) => {
     switch (element.id) {
-      case "name":
-        return { ...element, text: `ಹೆಸರು : ${name}` };
-      case "membership":
-        return { ...element, text: `Membership No: ${membership}` };
-      case "designation":
-        return { ...element, text: `ಹುದ್ದೆ  : ${designation}` };
-      case "village":
-        return { ...element, text: `ಗ್ರಾಮ  : ${village}` };
-      case "taluk":
-        return { ...element, text: `ತಾಲ್ಲೂಕು : ${taluk}` };
-      case "district":
-        return { ...element, text: `ಜಿಲ್ಲೆ : ${district}` };
-      case "mobile":
-        return { ...element, text: `ಮೊಬೈಲ : ${mobile}` };
-      case "aadhaar":
-        return { ...element, text: `ಆಧಾರ ನಂ : ${aadhaar}` };
-      case "vehicle-number":
-        return { ...element, text: `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}` };
+      case "name": return fitMemberText(element, `ಹೆಸರು : ${name}`);
+      case "membership": return fitMemberText(element, `Membership No: ${membership}`);
+      case "designation": return fitMemberText(element, `ಹುದ್ದೆ  : ${designation}`);
+      case "village": return fitMemberText(element, `ಗ್ರಾಮ  : ${village}`);
+      case "taluk": return fitMemberText(element, `ತಾಲ್ಲೂಕು : ${taluk}`);
+      case "district": return fitMemberText(element, `ಜಿಲ್ಲೆ : ${district}`);
+      case "mobile": return fitMemberText(element, `ಮೊಬೈಲ : ${mobile}`);
+      case "aadhaar": return fitMemberText(element, `ಆಧಾರ ನಂ : ${aadhaar}`);
+      case "vehicle-number": return fitMemberText(element, `ವಾಹನ ಸಂಖ್ಯೆ : ${vehicleNumber}`);
       case "valid-from":
-      case "back-valid-from":
-        return { ...element, text: `VALID FROM: ${validFrom}` };
+      case "back-valid-from": return fitMemberText(element, `VALID FROM: ${validFrom}`);
       case "valid-till":
-      case "back-valid-till":
-        return { ...element, text: `VALID TILL: ${validTill}` };
+      case "back-valid-till": return fitMemberText(element, `VALID TILL: ${validTill}`);
       default:
         return element;
     }
@@ -524,23 +513,6 @@ const initialElements: CardElement[] = [
   },
 
   {
-    id: "front-qr",
-    label: "QR Code",
-    kind: "qr",
-    text: "",
-    side: "front",
-    x: 650,
-    y: 145,
-    width: 170,
-    height: 170,
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#075c2b",
-    background: "#ffffff",
-    borderRadius: 12,
-  },
-
-  {
     id: "back-title",
     label: "Back Heading",
     kind: "text",
@@ -694,6 +666,39 @@ function getMasterTemplateElements(
       text: original.text,
     };
   });
+}
+
+function fitMemberText(
+  element: CardElement,
+  memberText: string
+): CardElement {
+  const maxFontSize = element.fontSize;
+  const minFontSize = 10;
+  const plainText = memberText.replace(/\s+/g, " ").trim();
+
+  if (!plainText) {
+    return { ...element, text: memberText, fontSize: maxFontSize };
+  }
+
+  const availableWidth = Math.max(20, element.width - 12);
+  const availableHeight = Math.max(20, element.height - 4);
+  const weightFactor =
+    element.fontWeight === "800" ? 0.62 :
+    element.fontWeight === "700" ? 0.60 :
+    element.fontWeight === "600" ? 0.58 : 0.55;
+
+  let fittedSize = maxFontSize;
+  while (
+    fittedSize > minFontSize &&
+    plainText.length * fittedSize * weightFactor > availableWidth
+  ) fittedSize -= 1;
+
+  while (
+    fittedSize > minFontSize &&
+    Math.ceil((plainText.length * fittedSize * weightFactor) / availableWidth) * fittedSize * 1.2 > availableHeight
+  ) fittedSize -= 1;
+
+  return { ...element, text: memberText, fontSize: Math.max(minFontSize, fittedSize) };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -1578,6 +1583,9 @@ function NewCardDesignerPageContent() {
             : "padding:0",
           "font-family:Arial,'Noto Sans Kannada','Noto Sans',sans-serif",
           "line-height:1.2",
+          "white-space:normal",
+          "overflow-wrap:anywhere",
+          "word-break:break-word",
         ].join(";");
 
         if (element.kind === "photo") {
@@ -2403,6 +2411,10 @@ function NewCardDesignerPageContent() {
 
                             touchAction:
                               "none",
+                            lineHeight: 1.2,
+                            whiteSpace: "normal",
+                            overflowWrap: "anywhere",
+                            wordBreak: "break-word",
                           }}
                         >
                           {element.text}
