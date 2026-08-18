@@ -189,7 +189,7 @@ export default function Admin() {
       }
 
       alert(
-        `Starting Membership Number ${number} ಆಗಿ save ಆಯಿತು ✅\n\nಹೊಸ memberಗೆ ${number} ರಿಂದ ಆರಂಭವಾಗುತ್ತದೆ.`
+        `Starting Membership Number ${number} ಆಗಿ save ಆಯಿತು ✅\n\nಇನ್ನು ಮುಂದೆ ${number}, ${number + 1}, ${number + 2}... ಎಂದು automatic ಆಗಿ ಮುಂದುವರಿಯುತ್ತದೆ.`
       );
     } finally {
       setSavingMembershipStart(
@@ -373,33 +373,13 @@ export default function Admin() {
   // =====================================================
 
   async function approve(a: Application) {
-    /*
-     * Membership Number:
-     *
-     * Admin once Starting Number save ಮಾಡಿದ ನಂತರ,
-     * ಪ್ರತಿಯೊಂದು approvalಗೆ Membership Number automatic ಆಗಿ
-     * one-by-one assign ಆಗುತ್ತದೆ.
-     *
-     * ಇಲ್ಲಿ ಮತ್ತೆ Membership Number ಕೇಳುವುದಿಲ್ಲ.
-     *
-     * approve_application RPC:
-     * - current next_membership_no ತೆಗೆದುಕೊಳ್ಳುತ್ತದೆ
-     * - ಆ number ಅನ್ನು memberಗೆ assign ಮಾಡುತ್ತದೆ
-     * - ನಂತರ next_membership_no ಅನ್ನು +1 ಮಾಡುತ್ತದೆ
-     */
-
-    const ok = confirm(
-      `${a.name} ಅವರನ್ನು Approve ಮಾಡಬೇಕೇ?\n\n` +
-        `Membership Number automatic ಆಗಿ ಮುಂದಿನ number ಬರುತ್ತದೆ.`
-    );
-
-    if (!ok) {
-      return;
-    }
 
     /* =========================================
        1. APPROVE MEMBER
-       Membership Number automatic
+
+       Membership Number ಅನ್ನು ಇಲ್ಲಿ ಕೇಳುವುದಿಲ್ಲ.
+       Admin Settingsನಲ್ಲಿ Save ಮಾಡಿದ Starting Numberನಿಂದ
+       Supabase automatic one-by-one number ಕೊಡಬೇಕು.
     ========================================= */
 
     const { error: approveError } =
@@ -412,22 +392,12 @@ export default function Admin() {
       );
 
     if (approveError) {
-      alert(
-        "Member approve ಆಗಲಿಲ್ಲ:\n\n" +
-          approveError.message
-      );
-
+      alert(approveError.message);
       return;
     }
 
     /* =========================================
        2. VALIDITY DATE
-
-       Approve Date
-       ↓
-       Valid From = Approve Date
-       ↓
-       Valid Till = 1 year - 1 day
     ========================================= */
 
     const today = new Date();
@@ -487,9 +457,6 @@ export default function Admin() {
 
     /* =========================================
        4. GET UPDATED MEMBER
-
-       RPC assign ಮಾಡಿದ automatic
-       Membership Number ಇಲ್ಲಿ ಪಡೆಯುತ್ತದೆ.
     ========================================= */
 
     const {
@@ -505,7 +472,6 @@ export default function Admin() {
       alert(
         "Approved member data load ಆಗಲಿಲ್ಲ."
       );
-
       return;
     }
 
@@ -531,8 +497,7 @@ export default function Admin() {
     alert(
       `Member Approved ✅\n\n` +
         `Membership Number: ${
-          updatedMember.membership_no ||
-          "—"
+          updatedMember.membership_no || "—"
         }\n` +
         `Valid From: ${validFrom}\n` +
         `Valid Till: ${validUntil}\n\n` +
